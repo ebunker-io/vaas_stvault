@@ -1,0 +1,98 @@
+{% load bootstrap3 %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>eBunker</title>
+    {% bootstrap_css %}
+    {% bootstrap_javascript %}
+    {% load static %}
+    <link rel="icon" href="{% static 'validators/favicon.ico' %}">
+  </head>
+<body>
+  <!-- Static navbar -->
+
+  <nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand" href="{% url 'validators:home' %}">首页</a>
+        <a target="_blank" class="navbar-brand" style="padding-left:30px" href="https://docs.ebunker.io/">文档</a>
+        <a class="navbar-brand" style="padding-left:30px" href="{% url 'validators:pool' %}">矿池</a>
+        <a class="navbar-brand" style="padding-left:30px" href="{% url 'validators:index' %}">浏览器</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+    </div>
+    <div>
+		{% load static %}
+    <div class="container">
+      <div class="row clearfix">
+        <div class="col-md-12 column">
+          <h3>
+            矿池
+          </h3>
+          <div class="row">
+            <div class="col-md-3">
+              <div class="thumbnail">
+                <div class="caption">
+                  <p>节点数</p>
+                  <h3>
+                    {{validator_size}}
+                  </h3>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="thumbnail">
+                <div class="caption">
+                  <p>矿池质押总金额</p>
+                  <h3>
+                    {{total_staked_amount}}
+                  </h3>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="thumbnail">
+                <div class="caption">
+                  <p>总收益(打包收益+共识收益)</p>
+                  <h3>
+                    {{total_earn}}E
+                  </h3>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="thumbnail">
+                <div class="caption">
+                  <p>年化收益率</p>
+                  <h3>
+                    {{apy}}%
+                  </h3>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+    <footer class="footer navbar-fixed-bottom">
+      <div class="container">
+        <p>© 2022 Company, Inc.</p>
+      </div>
+    </footer>
+  </div><!-- /container -->
+</body>
+</html>

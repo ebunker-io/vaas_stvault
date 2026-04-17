@@ -1,0 +1,40 @@
+{% extends 'validators/base.html' %}
+{% block header %}
+
+{% endblock header %}
+
+{% block content %}
+
+{% load static %}
+<h2>验证者信息</h2>
+<div class="table-responsive">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Index</th>
+          <th>余额</th>
+          <th>收益</th>
+          <th>状态</th>
+          <th>地址</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if validators %}
+            {% for validator in validators %}
+            <tr>
+                <td>{{validator.validator_index}}</td>
+                <td>{{validator.balance}}</td>
+                <td>{{validator.earn}}</td>
+                <td class="green">{{validator.status}}</td>
+                <td><a  href="https://beaconcha.in/validator/{{ validator.pubkey }}" target="_blank">{{ validator.pubkey }}</a></td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="4">未找到钱包的节点信息</td>
+            </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+{% endblock content %}

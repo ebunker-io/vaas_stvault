@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+    xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+    xmlns:image="http://www.sitemaps.org/schemas/sitemap-image/1.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+
+<image>
+    <image:image>
+        <image:loc>https://www.ebunker.io/_next/static/media/logo.8c68c2ca.png</image:loc>
+        <image:title>Ebunker Logo</image:title>
+    </image:image>
+</image>
+<url>
+    <loc>https://www.ebunker.io/</loc>
+    <lastmod>2023-09-22T00:58:58+00:00</lastmod>
+    <loc>https://www.ebunker.io/stake</loc>
+    <lastmod>2023-09-22T00:58:58+00:00</lastmod>
+    <loc>https://www.ebunker.io/dashboard</loc>
+    <lastmod>2023-09-22T00:58:58+00:00</lastmod>
+    <loc>https://www.ebunker.io/faq</loc>
+    <lastmod>2023-09-22T00:58:58+00:00</lastmod>
+    <loc>https://www.ebunker.io/stake/create</loc>
+    <lastmod>2023-09-22T00:58:58+00:00</lastmod>
+    <loc>https://www.ebunker.io/stake/upload</loc>
+    <lastmod>2023-09-22T00:58:58+00:00</lastmod>
+</url>
+
+
+</urlset>
