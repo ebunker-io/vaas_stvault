@@ -271,10 +271,12 @@ class DashboardMintstETHApiView(BaseApiView):
         if stvault.vault_owner.lower() != current_user.reward_address.lower():
             return self.error_response(request, 403, 'forbidden')
         dashboard = Web3Tool.check_address(stvault.dashboard)
-        # 校验 amount 必须大于0
+        # 校验 amount 必须大于0。amount 语义是要铸造的 stETH 数量（wei）。
         amount_wei = Web3Tool.to_wei(amount, "ether")
         if amount_wei <= 0:
             return self.error_response(request, 400, 'invalid_params', ['amount'])
+
+        # 容量校验仍按 shares 维度（与合约内部一致）
         amount_shares = STETHContractService.get_shares_by_pooled_eth(amount_wei)
         is_enough = StvaultService.check_remaining_minting_capacity_shares(dashboard, amount_shares)
         if not is_enough:
@@ -287,7 +289,9 @@ class DashboardMintstETHApiView(BaseApiView):
             return self.error_response(request, 500, 'system_error')
         if report_tx:
             tx.append(report_tx)
-        mint_tx = DashboardContractService.mint_steth(from_address, dashboard, recipient, amount_shares)
+        # mintStETH(_amountOfStETH) 接收 stETH wei，合约内部自己换算 shares，
+        # 这里若再传 amount_shares 相当于二次换算，会导致用户少收 ~3% (rebase 比例)。
+        mint_tx = DashboardContractService.mint_steth(from_address, dashboard, recipient, amount_wei)
         tx.append(mint_tx)
         return self.success_response(request, tx)
 
