@@ -157,6 +157,12 @@ STVAULT = {
 
 # Internal service token (for service-to-service calls)
 INTERNAL_SERVICE_TOKEN = os.getenv("BACKEND_INTERNAL_SERVICE_TOKEN", "")
+# 内部服务 IP 白名单（逗号分隔，支持单 IP 或 CIDR，例如 "10.0.0.0/8,192.168.1.5"）
+INTERNAL_SERVICE_IP_WHITELIST = [
+    ip.strip()
+    for ip in os.getenv("BACKEND_INTERNAL_SERVICE_IP_WHITELIST", "").split(",")
+    if ip.strip()
+]
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.environ["BACKEND_EMAIL_HOST"]

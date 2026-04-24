@@ -76,6 +76,7 @@ class Result:
             'stvault_creation_paused': 'StVault creation is paused, please try again later',
             'stvault_info_request_failed': 'StVault info request failed',
             'stvault_not_exist': 'Vault does not exist',
+            'forbidden': 'You do not have permission to perform this action',
         },
         'zh': {
             'success': '成功',
@@ -145,6 +146,7 @@ class Result:
             'stvault_creation_paused': 'StVault创建已暂停, 请稍后重试',
             'stvault_info_request_failed': 'StVault数据获取失败',
             'stvault_not_exist': 'Vault不存在',
+            'forbidden': '无权执行此操作',
         }
     }
 

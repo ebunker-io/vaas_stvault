@@ -1,3 +1,5 @@
+import hmac
+import ipaddress
 import logging
 from decimal import Decimal
 from rest_framework.views import APIView
@@ -314,65 +316,90 @@ class InternalApiView(BaseApiView):
 
     def get_client_ip(self, request):
         """
-        获取客户端真实 IP（考虑代理情况）
-        :param request: 请求对象
-        :return: 客户端 IP 地址
+        获取客户端真实 IP，用于 IP 白名单校验。
+        仅使用 REMOTE_ADDR —— HTTP_X_FORWARDED_FOR 可被客户端任意伪造，
+        不能作为内部服务访问控制的信任源。若部署在受信任的反向代理之后，
+        应在代理层强制覆写 REMOTE_ADDR，而不是在此读取 XFF。
         """
+        return request.META.get('REMOTE_ADDR', '') or ''
+
+    def _is_ip_whitelisted(self, client_ip):
+        """
+        判断客户端 IP 是否落在内部服务 IP 白名单中（支持单 IP 或 CIDR）。
+        """
+        whitelist = getattr(settings, 'INTERNAL_SERVICE_IP_WHITELIST', None) or []
+        if not whitelist or not client_ip:
+            return False
         try:
-            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-            if x_forwarded_for:
-                ip = x_forwarded_for.split(',')[0].strip()
-            else:
-                ip = request.META.get('REMOTE_ADDR', '0.0.0.0')
-            return ip
-        except Exception as e:
-            logger.warning(f"Failed to get client IP: {e}")
-            return request.META.get('REMOTE_ADDR', '0.0.0.0')
+            ip_obj = ipaddress.ip_address(client_ip)
+        except ValueError:
+            return False
+        for entry in whitelist:
+            entry = (entry or '').strip()
+            if not entry:
+                continue
+            try:
+                if ip_obj in ipaddress.ip_network(entry, strict=False):
+                    return True
+            except ValueError:
+                logger.warning(f"Invalid INTERNAL_SERVICE_IP_WHITELIST entry: {entry}")
+        return False
+
+    def _is_token_valid(self, request):
+        """
+        验证内部服务 Token，使用 hmac.compare_digest 进行常量时间比较。
+        空值或占位符（'xxx'）视为未配置，直接拒绝。
+        """
+        internal_token = getattr(settings, 'INTERNAL_SERVICE_TOKEN', '') or ''
+        if not internal_token or internal_token == 'xxx':
+            return False
+
+        auth_header = (
+            request.META.get('HTTP_X_INTERNAL_TOKEN') or
+            request.META.get('HTTP_X_INTERNAL_SERVICE_TOKEN') or
+            request.META.get('HTTP_AUTHORIZATION') or
+            ''
+        )
+        if not auth_header:
+            return False
+
+        token = auth_header
+        if token.startswith('Bearer '):
+            token = token.split(' ', 1)[1]
+
+        return hmac.compare_digest(
+            token.encode('utf-8'),
+            internal_token.encode('utf-8'),
+        )
 
     def verify_internal_access(self, request):
         """
-        验证内部访问（IP 白名单或内部 Token 任一通过即可）
-        :param request: 请求对象
-        :return: (is_valid, response) - (是否有效, 如果无效则返回错误响应)
+        验证内部访问：IP 白名单或内部 Token 任一通过即可。
+        若两者均未配置，则一律拒绝（fail closed）。
+        :return: (is_valid, response)
         """
         if not self.require_internal_access:
             return True, None
 
         try:
-            # 验证内部服务 Token
-            internal_token = getattr(settings, 'INTERNAL_SERVICE_TOKEN', None)
-            token_valid = False
+            client_ip = self.get_client_ip(request)
+            ip_whitelisted = self._is_ip_whitelisted(client_ip)
+            token_valid = self._is_token_valid(request)
 
-            if internal_token:
-                # 从请求头获取 Token（支持多种格式）
-                auth_header = (
-                    request.META.get('HTTP_X_INTERNAL_TOKEN') or
-                    request.META.get('HTTP_X_INTERNAL_SERVICE_TOKEN') or
-                    request.META.get('HTTP_AUTHORIZATION')
+            if ip_whitelisted and token_valid:
+                logger.info(
+                    f"Internal API access granted "
+                    f"(ip={client_ip}, ip_whitelisted={ip_whitelisted}, token_valid={token_valid})"
                 )
-
-                if auth_header:
-                    # 支持 Bearer Token 格式
-                    if auth_header.startswith('Bearer '):
-                        token = auth_header.split(' ')[1]
-                    else:
-                        token = auth_header
-
-                    if token == internal_token:
-                        token_valid = True
-
-            # Token 验证通过
-            if token_valid:
-                logger.info(f"Internal API access granted (Token valid: {token_valid})")
                 return True, None
 
-            # 验证失败，返回错误响应，由 InternalApiView.dispatch 直接返回
-            logger.warning(f"Internal API access denied (Token valid: {token_valid})")
-            # 如果 error_response 失败，抛出异常让基类统一处理为 500
+            logger.warning(
+                f"Internal API access denied "
+                f"(ip={client_ip}, ip_whitelisted={ip_whitelisted}, token_valid={token_valid})"
+            )
             response = self.error_response(request, 401, 'internal_invalid_token')
             return False, response
         except Exception as e:
-            # 如果验证过程本身出错，或 error_response 失败，抛出异常让基类统一处理为 500
             logger.error(f"verify_internal_access error: {e}", exc_info=True)
             raise
 

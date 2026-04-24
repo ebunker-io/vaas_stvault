@@ -29,9 +29,9 @@ class StVaultCreateApiView(BaseApiView):
         :param address: StVault地址
         """
         #登录验证
-        is_valid, items = self.verify_auth(request)
+        is_valid, current_user = self.verify_auth(request)
         if not is_valid:
-            return items
+            return current_user
 
         #参数验证
         is_valid, items = self.validate_params(request, ['from_address'])
@@ -42,6 +42,8 @@ class StVaultCreateApiView(BaseApiView):
         if not Web3Tool.is_address(from_address):
             return self.error_response(request, 400, 'invalid_params', ['from_address'])
         from_address = Web3Tool.check_address(from_address)
+        if current_user.reward_address.lower() != from_address.lower():
+            return self.error_response(request, 403, 'forbidden')
         vault_owner = from_address
 
         # 检查是否暂停创建
@@ -84,9 +86,9 @@ class StVaultListApiView(BaseApiView):
         获取StVault列表
         """
         #登录验证
-        is_valid, items = self.verify_auth(request)
+        is_valid, current_user = self.verify_auth(request)
         if not is_valid:
-            return items
+            return current_user
 
         #参数验证
         is_valid, items = self.validate_params(request, ['vault_owner'], request_type=REQUEST_TYPE.GET)
@@ -94,6 +96,8 @@ class StVaultListApiView(BaseApiView):
             return items
 
         vault_owner = Web3Tool.check_address(items.get('vault_owner'))
+        if current_user.reward_address.lower() != vault_owner.lower():
+            return self.error_response(request, 403, 'forbidden')
         # 获取列表数据
         stvaults_data = StVault.get_list_queryset(vault_owner)
         # 转换 Decimal 字段为字符串
@@ -112,9 +116,9 @@ class StVaultDashboardListApiView(BaseApiView):
         获取StVault列表
         """
         #登录验证
-        is_valid, items = self.verify_auth(request)
+        is_valid, current_user = self.verify_auth(request)
         if not is_valid:
-            return items
+            return current_user
 
         #参数验证
         is_valid, items = self.validate_params(request, ['vault_owner'], request_type=REQUEST_TYPE.GET)
@@ -122,6 +126,8 @@ class StVaultDashboardListApiView(BaseApiView):
             return items
 
         vault_owner = Web3Tool.check_address(items.get('vault_owner'))
+        if current_user.reward_address.lower() != vault_owner.lower():
+            return self.error_response(request, 403, 'forbidden')
         # 获取详情数据（已经是字典列表）
         stvaults_data = StVault.get_dashboard_queryset(vault_owner)
 
@@ -145,9 +151,9 @@ class DashboardSupplyApiView(BaseApiView):
         :param amount: 存款金额
         """
         #登录验证
-        is_valid, items = self.verify_auth(request)
+        is_valid, current_user = self.verify_auth(request)
         if not is_valid:
-            return items
+            return current_user
 
         #参数验证
         is_valid, items = self.validate_params(request, ['from_address', 'vault', 'amount'])
@@ -158,10 +164,15 @@ class DashboardSupplyApiView(BaseApiView):
         vault = Web3Tool.check_address(items.get('vault'))
         amount = items.get('amount')
 
+        if current_user.reward_address.lower() != Web3Tool.check_address(from_address).lower():
+            return self.error_response(request, 403, 'forbidden')
+
         # 查询vault是否存在
         stvault = StVault.objects.filter(vault__iexact=vault).first()
         if not stvault:
             return self.error_response(request, 400, 'stvault_not_exist')
+        if stvault.vault_owner.lower() != current_user.reward_address.lower():
+            return self.error_response(request, 403, 'forbidden')
 
         # 校验 amount 必须大于0
         value_wei = Web3Tool.to_wei(amount, "ether")
@@ -185,9 +196,9 @@ class DashboardWithdrawApiView(BaseApiView):
         :param amount: 提现金额
         """
         #登录验证
-        is_valid, items = self.verify_auth(request)
+        is_valid, current_user = self.verify_auth(request)
         if not is_valid:
-            return items
+            return current_user
 
         #参数验证
         is_valid, items = self.validate_params(request, ['from_address', 'vault', 'amount'])
@@ -198,10 +209,15 @@ class DashboardWithdrawApiView(BaseApiView):
         amount = items.get('amount')
         recipient = Web3Tool.check_address(from_address)
 
+        if current_user.reward_address.lower() != Web3Tool.check_address(from_address).lower():
+            return self.error_response(request, 403, 'forbidden')
+
         # 查询vault是否存在
         stvault = StVault.objects.filter(vault__iexact=vault).first()
         if not stvault:
             return self.error_response(request, 400, 'stvault_not_exist')
+        if stvault.vault_owner.lower() != current_user.reward_address.lower():
+            return self.error_response(request, 403, 'forbidden')
         dashboard = Web3Tool.check_address(stvault.dashboard)
 
         # 校验 amount 必须大于0
@@ -231,9 +247,9 @@ class DashboardMintstETHApiView(BaseApiView):
         :param amount: 铸造金额
         """
         #登录验证
-        is_valid, items = self.verify_auth(request)
+        is_valid, current_user = self.verify_auth(request)
         if not is_valid:
-            return items
+            return current_user
 
         #参数验证
         is_valid, items = self.validate_params(request, ['from_address', 'vault', 'amount'])
@@ -245,10 +261,15 @@ class DashboardMintstETHApiView(BaseApiView):
         amount = items.get('amount')
         recipient = Web3Tool.check_address(from_address)
 
+        if current_user.reward_address.lower() != from_address.lower():
+            return self.error_response(request, 403, 'forbidden')
+
         # 查询vault是否存在
         stvault = StVault.objects.filter(vault__iexact=vault).first()
         if not stvault:
             return self.error_response(request, 400, 'stvault_not_exist')
+        if stvault.vault_owner.lower() != current_user.reward_address.lower():
+            return self.error_response(request, 403, 'forbidden')
         dashboard = Web3Tool.check_address(stvault.dashboard)
         # 校验 amount 必须大于0
         amount_wei = Web3Tool.to_wei(amount, "ether")
@@ -279,9 +300,9 @@ class DashboardRepaystETHApiView(BaseApiView):
         :param amount: 还款金额
         """
         #登录验证
-        is_valid, items = self.verify_auth(request)
+        is_valid, current_user = self.verify_auth(request)
         if not is_valid:
-            return items
+            return current_user
 
         #参数验证
         is_valid, items = self.validate_params(request, ['from_address', 'vault', 'amount'])
@@ -291,10 +312,16 @@ class DashboardRepaystETHApiView(BaseApiView):
         from_address = items.get('from_address')
         vault = Web3Tool.check_address(items.get('vault'))
         amount_steth = items.get('amount')
+
+        if current_user.reward_address.lower() != Web3Tool.check_address(from_address).lower():
+            return self.error_response(request, 403, 'forbidden')
+
         # 查询vault是否存在
         stvault = StVault.objects.filter(vault__iexact=vault).first()
         if not stvault:
             return self.error_response(request, 400, 'stvault_not_exist')
+        if stvault.vault_owner.lower() != current_user.reward_address.lower():
+            return self.error_response(request, 403, 'forbidden')
         dashboard = Web3Tool.check_address(stvault.dashboard)
         # 校验 amount 必须大于0
         amount_steth_wei = Web3Tool.to_wei(amount_steth, "ether")
@@ -330,9 +357,9 @@ class StVaultInfoRefreshApiView(BaseApiView):
         获取StVault详情
         """
         #登录验证
-        is_valid, items = self.verify_auth(request)
+        is_valid, current_user = self.verify_auth(request)
         if not is_valid:
-            return items
+            return current_user
 
         #参数验证
         is_valid, items = self.validate_params(request, ['vault'], request_type=REQUEST_TYPE.GET)
@@ -344,6 +371,8 @@ class StVaultInfoRefreshApiView(BaseApiView):
         stvault = StVault.objects.filter(vault__iexact=vault).first()
         if not stvault:
             return self.error_response(request, 400, 'stvault_not_exist')
+        if stvault.vault_owner.lower() != current_user.reward_address.lower():
+            return self.error_response(request, 403, 'forbidden')
         # 更新valut数据
         result = StvaultService.refresh_stvault(vault)
         if result == False:
@@ -363,9 +392,9 @@ class StVaultRefreshBalanceApiView(BaseApiView):
         刷新StVault余额
         """
         #登录验证
-        is_valid, items = self.verify_auth(request)
+        is_valid, current_user = self.verify_auth(request)
         if not is_valid:
-            return items
+            return current_user
 
         #参数验证
         is_valid, items = self.validate_params(request, ['vault'], request_type=REQUEST_TYPE.GET)
@@ -377,6 +406,8 @@ class StVaultRefreshBalanceApiView(BaseApiView):
         stvault = StVault.objects.filter(vault__iexact=vault).first()
         if not stvault:
             return self.error_response(request, 400, 'stvault_not_exist')
+        if stvault.vault_owner.lower() != current_user.reward_address.lower():
+            return self.error_response(request, 403, 'forbidden')
         dashboard = Web3Tool.check_address(stvault.dashboard)
 
         # 更新valut数据
