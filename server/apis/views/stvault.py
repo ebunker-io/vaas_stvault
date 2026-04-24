@@ -328,7 +328,19 @@ class DashboardRepaystETHApiView(BaseApiView):
         if amount_steth_wei <= 0:
             return self.error_response(request, 400, 'invalid_params', ['amount'])
 
-        amount_shares = STETHContractService.get_shares_by_pooled_eth(amount_steth_wei)
+        # 全额还款时直接用 liability_shares，避免 shares→stETH→shares 往返因整数除法丢失 1 share（约 1 wei stETH）
+        liability_shares = DashboardContractService.get_liability_shares(dashboard)
+        if liability_shares is None:
+            return self.error_response(request, 500, 'system_error')
+        liability_steth_wei = STETHContractService.get_pooled_eth_by_shares(liability_shares)
+        if liability_steth_wei is None:
+            return self.error_response(request, 500, 'system_error')
+
+        if amount_steth_wei >= liability_steth_wei:
+            amount_shares = liability_shares
+        else:
+            amount_shares = STETHContractService.get_shares_by_pooled_eth(amount_steth_wei)
+
         is_enough = StvaultService.check_liability_shares(dashboard, amount_shares)
         if not is_enough:
             return self.error_response(request, 400, 'invalid_params', ['amount must be less than liability shares'])
