@@ -32,33 +32,33 @@ class StvaultUtil:
         return f"{value_str}"
 
     # ===== 计算健康因子 =====
+    HEALTH_RATIO_CAP = Decimal('9999.99')  # 超过此值业务上等同 ∞，统一返回 'Infinity'
+
     @classmethod
     def calculate_health(cls, total_value: int, liability_shares_in_steth_wei: int, forced_rebalance_threshold_bp: int) -> dict:
         """
-        计算健康因子
+        计算健康因子（百分比形式）。
+        - 无 debt（liability <= 0）→ 'Infinity'
+        - liability 极小导致 ratio 超出上限 → 同样返回 'Infinity'
+        - 正常区间 → 形如 '152.34' 的字符串，2 位小数
+        Decimal 全流程，不走 float，避免大数被序列化成科学计数法。
         """
-        # 将 JS/TS 的 calculateHealth 逻辑用 Python 实现
-
-        # 转换为 Decimal，保证高精度
         total_value = Decimal(total_value)
-        liability_shares_in_steth_wei = Decimal(liability_shares_in_steth_wei)
-        forced_rebalance_threshold_bp = Decimal(forced_rebalance_threshold_bp)
+        liability = Decimal(liability_shares_in_steth_wei)
+        bp = Decimal(forced_rebalance_threshold_bp)
 
         BASIS_POINTS_DENOMINATOR = Decimal(10_000)
-        PRECISION = Decimal('1e18')
+        adjusted_valuation = total_value * (BASIS_POINTS_DENOMINATOR - bp) / BASIS_POINTS_DENOMINATOR
 
-        threshold_multiplier = ((BASIS_POINTS_DENOMINATOR - forced_rebalance_threshold_bp) * PRECISION) / BASIS_POINTS_DENOMINATOR
-        adjusted_valuation = (total_value * threshold_multiplier) / PRECISION
+        if liability <= 0:
+            return {"health_ratio": "Infinity", "is_healthy": True}
 
-        if liability_shares_in_steth_wei > 0:
-            health_ratio18 = (adjusted_valuation * PRECISION * Decimal(100)) / liability_shares_in_steth_wei
-            health_ratio = float(health_ratio18 / PRECISION)
-        else:
-            health_ratio = "Infinity"
+        ratio = adjusted_valuation * Decimal(100) / liability
+        if ratio > cls.HEALTH_RATIO_CAP:
+            return {"health_ratio": "Infinity", "is_healthy": True}
 
-        is_healthy = health_ratio == "Infinity" or health_ratio >= 100
-
+        ratio = ratio.quantize(Decimal('0.01'))
         return {
-            "health_ratio": str(health_ratio),
-            "is_healthy": is_healthy,
+            "health_ratio": str(ratio),
+            "is_healthy": ratio >= Decimal(100),
         }

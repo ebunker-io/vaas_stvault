@@ -88,17 +88,22 @@ class StVault(models.Model):
 
     @property
     def health_ratio(self) -> float:
-        """从 health_info 中获取健康比率"""
-        if self.health_factor and isinstance(self.health_factor, float):
-            return self.health_factor
-        return 0.0
+        """health_factor 是 CharField，可能是 'Infinity' 或形如 '150.34' 的字符串"""
+        if self.health_factor == 'Infinity':
+            return float('inf')
+        try:
+            return float(self.health_factor)
+        except (TypeError, ValueError):
+            return 0.0
 
     @property
     def is_healthy(self) -> bool:
-        """从 health_info 中获取健康状态"""
-        if self.health_factor > 100:
+        if self.health_factor == 'Infinity':
             return True
-        return False
+        try:
+            return float(self.health_factor) >= 100
+        except (TypeError, ValueError):
+            return False
 
 
     # ===== 查询方法 =====
