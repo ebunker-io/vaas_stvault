@@ -276,11 +276,13 @@ class DashboardMintstETHApiView(BaseApiView):
         if amount_wei <= 0:
             return self.error_response(request, 400, 'invalid_params', ['amount'])
 
-        # 容量校验仍按 shares 维度（与合约内部一致）
-        amount_shares = STETHContractService.get_shares_by_pooled_eth(amount_wei)
-        is_enough = StvaultService.check_remaining_minting_capacity_shares(dashboard, amount_shares)
-        if not is_enough:
-            return self.error_response(request, 400, 'invalid_params')
+        # 读真实剩余容量，决定走 shares 路径还是 stETH 路径
+        remaining_capacity_shares = DashboardContractService.get_remaining_minting_capacity_shares(dashboard)
+        if remaining_capacity_shares is None:
+            return self.error_response(request, 500, 'system_error')
+        remaining_capacity_steth = STETHContractService.get_pooled_eth_by_shares(remaining_capacity_shares)
+        if remaining_capacity_steth is None:
+            return self.error_response(request, 500, 'system_error')
 
         # 交易列表
         tx = []
@@ -289,9 +291,20 @@ class DashboardMintstETHApiView(BaseApiView):
             return self.error_response(request, 500, 'system_error')
         if report_tx:
             tx.append(report_tx)
-        # mintStETH(_amountOfStETH) 接收 stETH wei，合约内部自己换算 shares，
-        # 这里若再传 amount_shares 相当于二次换算，会导致用户少收 ~3% (rebase 比例)。
-        mint_tx = DashboardContractService.mint_steth(from_address, dashboard, recipient, amount_wei)
+
+        if amount_wei >= remaining_capacity_steth:
+            # 全额铸造时直接走 mintShares，避免 mintStETH(amount_wei) 内部 getSharesByPooledEth
+            # 整数除法向下取整，导致用户少收 1 share（约 1 wei stETH）的残留。
+            mint_tx = DashboardContractService.mint_shares(from_address, dashboard, recipient, remaining_capacity_shares)
+        else:
+            # 部分铸造：容量校验仍按 shares 维度（与合约内部一致）
+            amount_shares = STETHContractService.get_shares_by_pooled_eth(amount_wei)
+            if not StvaultService.check_remaining_minting_capacity_shares(dashboard, amount_shares):
+                return self.error_response(request, 400, 'invalid_params')
+            # mintStETH(_amountOfStETH) 接收 stETH wei，合约内部自己换算 shares，
+            # 这里若再传 amount_shares 相当于二次换算，会导致用户少收 ~3% (rebase 比例)。
+            mint_tx = DashboardContractService.mint_steth(from_address, dashboard, recipient, amount_wei)
+
         tx.append(mint_tx)
         return self.success_response(request, tx)
 

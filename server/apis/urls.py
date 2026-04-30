@@ -4,9 +4,12 @@ from .views import session
 from .views import captcha
 from .views import customer
 from .views import stvault
+from .views import rpc
 
 app_name = 'api'
 urlpatterns = [
+    path('rpc/eth-mainnet', rpc.RpcProxyMainnetView.as_view(), name="rpc_eth_mainnet"),
+    path('rpc/hoodi', rpc.RpcProxyHoodiView.as_view(), name="rpc_hoodi"),
     path('sessions', session.SessionApiView.as_view(), name="login"),
 
     path('captchas', captcha.CaptchaApiView.as_view(), name="captchas"),

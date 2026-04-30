@@ -164,6 +164,10 @@ INTERNAL_SERVICE_IP_WHITELIST = [
     if ip.strip()
 ]
 
+# 前端 RPC 代理：将 JSON-RPC 请求转发到此 upstream，避免在前端 bundle 中暴露 provider key。
+RPC_MAINNET_UPSTREAM = os.getenv("BACKEND_RPC_MAINNET_UPSTREAM", "")
+RPC_HOODI_UPSTREAM = os.getenv("BACKEND_RPC_HOODI_UPSTREAM", "")
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.environ["BACKEND_EMAIL_HOST"]
 EMAIL_PORT = os.environ["BACKEND_EMAIL_PORT"]
