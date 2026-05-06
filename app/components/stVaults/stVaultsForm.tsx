@@ -78,16 +78,22 @@ const StVaultsForm = ({ address, list, apr }: { address: `0x${string}` | undefin
   const [showFailedModal, setShowFailedModal] = useState(false)
   const [pendingTransactions, setPendingTransactions] = useState<any[]>([])
   const [currentTxIndex, setCurrentTxIndex] = useState(0)
+  const [currentTxHash, setCurrentTxHash] = useState<`0x${string}` | undefined>(undefined)
   const [lastTxHash, setLastTxHash] = useState<`0x${string}` | undefined>(undefined)
   const lastTxDataRef = useRef<any>(null)
   const { refresh: refreshSupply, data: supplyDataResult } = useBalanceRefresh(stVaultsAddress)
-  
+
+  // 等待当前交易的确认（用于顺序执行）
+  const { isLoading: isWaitingCurrentReceipt, isSuccess: isCurrentReceiptSuccess, isError: isCurrentReceiptError } = useWaitForTransactionReceipt({
+    hash: currentTxHash,
+  })
+
   // 等待最后一个交易的确认
   const { isLoading: isWaitingReceipt, isSuccess: isReceiptSuccess, isError: isReceiptError } = useWaitForTransactionReceipt({
     hash: lastTxHash && currentTxIndex + 1 >= pendingTransactions.length ? lastTxHash : undefined,
   })
-  
-  const isLoading = loading || supplyLoading || isTransactionPending || isWaitingReceipt;
+
+  const isLoading = loading || supplyLoading || isTransactionPending || isWaitingReceipt || isWaitingCurrentReceipt;
  
   const getMaxValueFull = () => {
     return balance?.value ? formatWeiToEthFull(balance.value.toString()) : '0'
@@ -417,25 +423,45 @@ const StVaultsForm = ({ address, list, apr }: { address: `0x${string}` | undefin
 
   useEffect(() => {
     if (txData && pendingTransactions.length > 0 && txData !== lastTxDataRef.current) {
-      console.log('Transaction sent successfully:', txData);
+      console.log(`Transaction ${currentTxIndex + 1}/${pendingTransactions.length} sent successfully:`, txData);
       lastTxDataRef.current = txData;
 
-      // 如果还有待执行的交易，执行下一个
       if (currentTxIndex + 1 < pendingTransactions.length) {
-        const nextIndex = currentTxIndex + 1;
-        setCurrentTxIndex(nextIndex);
-        // 等待一小段时间后执行下一个交易，确保前一个交易已确认
-        setTimeout(() => {
-          executeNextTransaction(pendingTransactions, nextIndex);
-        }, 1000);
+        // 还有后续交易：等链上 receipt 之后再发下一笔，避免依赖未确认状态
+        setCurrentTxHash(txData as `0x${string}`);
       } else {
         // 最后一个交易，等待确认
-        if (txData) {
-          setLastTxHash(txData as `0x${string}`);
-        }
+        setLastTxHash(txData as `0x${string}`);
       }
     }
-  }, [txData, pendingTransactions, currentTxIndex, executeNextTransaction])
+  }, [txData, pendingTransactions, currentTxIndex])
+
+  // 当前交易确认成功，发下一笔
+  useEffect(() => {
+    if (isCurrentReceiptSuccess && currentTxHash && currentTxIndex + 1 < pendingTransactions.length) {
+      console.log(`Transaction ${currentTxIndex + 1} confirmed, executing next transaction...`);
+      const nextIndex = currentTxIndex + 1;
+      setCurrentTxIndex(nextIndex);
+      setCurrentTxHash(undefined);
+      lastTxDataRef.current = null;
+      executeNextTransaction(pendingTransactions, nextIndex);
+    }
+  }, [isCurrentReceiptSuccess, currentTxHash, currentTxIndex, pendingTransactions, executeNextTransaction])
+
+  // 当前交易确认失败，整批中止
+  useEffect(() => {
+    if (isCurrentReceiptError && currentTxHash) {
+      console.error(`Transaction ${currentTxIndex + 1} failed on chain`);
+      setLoading(false);
+      setSupplyParams(null);
+      setPendingTransactions([]);
+      setCurrentTxIndex(0);
+      setCurrentTxHash(undefined);
+      setLastTxHash(undefined);
+      lastTxDataRef.current = null;
+      setShowFailedModal(true);
+    }
+  }, [isCurrentReceiptError, currentTxHash, currentTxIndex])
 
   // 监听最后一个交易的确认状态
   useEffect(() => {
@@ -445,6 +471,7 @@ const StVaultsForm = ({ address, list, apr }: { address: `0x${string}` | undefin
       setSupplyParams(null);
       setPendingTransactions([]);
       setCurrentTxIndex(0);
+      setCurrentTxHash(undefined);
       setLastTxHash(undefined);
       lastTxDataRef.current = null;
       setShowSuccessModal(true);
@@ -464,6 +491,7 @@ const StVaultsForm = ({ address, list, apr }: { address: `0x${string}` | undefin
       setSupplyParams(null);
       setPendingTransactions([]);
       setCurrentTxIndex(0);
+      setCurrentTxHash(undefined);
       setLastTxHash(undefined);
       lastTxDataRef.current = null;
       console.error('Transaction receipt error');
@@ -477,6 +505,7 @@ const StVaultsForm = ({ address, list, apr }: { address: `0x${string}` | undefin
       setSupplyParams(null);
       setPendingTransactions([]);
       setCurrentTxIndex(0);
+      setCurrentTxHash(undefined);
       setLastTxHash(undefined);
       lastTxDataRef.current = null;
       console.error('Error:', supplyError || txError);
