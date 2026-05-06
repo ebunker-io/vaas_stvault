@@ -15,9 +15,18 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def env_bool(name: str, default: bool = False) -> bool:
+    """安全解析布尔环境变量。绝不要用 eval() —— 它会把任意 Python 表达式都执行掉。"""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 SECRET_KEY = os.environ["BACKEND_SECRET_KEY"]
 
-DEBUG = eval(os.getenv("BACKEND_DEBUG"))
+DEBUG = env_bool("BACKEND_DEBUG")
 
 ALLOWED_HOSTS = os.getenv("BACKEND_ALLOWED_HOSTS").split(",")
 
@@ -256,7 +265,7 @@ APP_CONFIG = [
 DING = {
     'endpoint': 'https://oapi.dingtalk.com/robot/send?access_token=',
     'secret_access_key': os.getenv("BACKEND_DING_SECRET_ACCESS_KEY"),
-    'enable': eval(os.getenv("BACKEND_DING_ENABLE")),
+    'enable': env_bool("BACKEND_DING_ENABLE"),
     'secret_access_keys': {
         'daily_report': os.getenv("BACKEND_DING_SECRET_ACCESS_KEY_DAILY"),
         'hourly_report': os.getenv("BACKEND_DING_SECRET_ACCESS_KEY_HOURLY"),
@@ -267,7 +276,7 @@ DING = {
 }
 
 LARK = {
-    'enable': eval(os.getenv("BACKEND_LARK_ENABLE")),
+    'enable': env_bool("BACKEND_LARK_ENABLE"),
     'endpoint': 'https://open.feishu.cn/open-apis/bot/v2/hook/',
     'secret_access_keys': {
         'daily_report': os.getenv("BACKEND_LARK_SECRET_ACCESS_KEY_DAILY"),
