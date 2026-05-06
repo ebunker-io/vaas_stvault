@@ -305,9 +305,9 @@ class BaseApiView(APIView):
 
 class InternalApiView(BaseApiView):
     """
-    内部服务专用 API 基类 无需登录验证
-    要求 IP 白名单或内部 Token 验证（任一通过即可）
-    用于限制只能被内部服务或内部 VPN 调用的接口
+    内部服务专用 API 基类，无需登录验证。
+    访问要求：IP 白名单 **且** 内部 Token 必须同时通过（fail-closed）；
+    任一缺失/未配置直接拒绝。用于限制只能被内部服务或内部 VPN 调用的接口。
     """
     # 是否需要登录验证
     require_auth = False
@@ -374,8 +374,8 @@ class InternalApiView(BaseApiView):
 
     def verify_internal_access(self, request):
         """
-        验证内部访问：IP 白名单或内部 Token 任一通过即可。
-        若两者均未配置，则一律拒绝（fail closed）。
+        验证内部访问：IP 白名单 **且** 内部 Token 都必须通过。
+        任一未配置或不匹配，一律拒绝（fail-closed）。
         :return: (is_valid, response)
         """
         if not self.require_internal_access:
