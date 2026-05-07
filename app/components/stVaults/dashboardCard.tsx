@@ -43,9 +43,11 @@ const formatWeiToEthFull = (wei: string) => {
    
   return formatEther(BigInt(wei));
 }
-const formatHealthFactor = (healthFactor: string) => {
-  if (healthFactor === 'Infinity') return '∞ %';
+const formatHealthFactor = (healthFactor: string | null | undefined) => {
+  if (!healthFactor || healthFactor === 'Infinity') return '∞';
   const num = parseFloat(healthFactor);
+  if (!Number.isFinite(num) || num >= 9999) return '∞';
+  if (num < 0) return '—';
   return `${Math.round(num)}%`;
 }
 
