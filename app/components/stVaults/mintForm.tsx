@@ -146,6 +146,11 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
           call.value = `0x${txValue.toString(16)}`
         }
 
+        // 后端给出的 gas 转成 hex 传给钱包；不下发就不带，让钱包自估
+        if (tx.gas) {
+          call.gas = `0x${BigInt(tx.gas).toString(16)}`
+        }
+
         return call
       })
 
@@ -393,6 +398,9 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
         value: txValue,
         data: transaction.data as `0x${string}`,
         chainId: transaction.chainId,
+        // 后端用 estimate_gas + 1.2x buffer 算出 gas，避免钱包自己估算时
+        // 在含 oracle proof / state-dependent 的 stVault tx 上估低导致 revert
+        gas: transaction.gas ? BigInt(transaction.gas) : undefined,
       });
     } catch (error) {
       console.error('Send transaction error:', error);

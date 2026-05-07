@@ -60,6 +60,9 @@ const CreateVaultForm = ({ address, apr, count }: { address: `0x${string}` | und
           to: createData.to as `0x${string}`,
           value: BigInt(typeof createData.value === 'string' ? createData.value : createData.value.toString()),
           data: createData.data as `0x${string}`,
+          // 后端用 estimate_gas + 1.2x buffer 算出 gas，避免钱包自己估算时
+          // 在含 oracle proof / state-dependent 的 stVault tx 上估低导致 revert
+          gas: createData.gas ? BigInt(createData.gas) : undefined,
         });
       } catch (error) {
         console.error('Send transaction error:', error);
