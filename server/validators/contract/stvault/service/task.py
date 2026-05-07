@@ -192,7 +192,10 @@ class StVaultTask(object):
                     operator_fee = metrics_data.get('operator_fee')
 
                     # 更新staking_apr
-                    if staking_apr and lido_fee and operator_fee is not None:
+                    # 用 is not None 而非 truthy 判断 —— APR 可能合法地为 0 或负数（vault 当期负收益），
+                    # lido_fee 在 vault 早期可能合法为 0，truthy 检查会把这些合法值当作"缺字段"跳过更新，
+                    # 导致 DB 永远停在默认值 0，前端就只能看到 0%。
+                    if staking_apr is not None and lido_fee is not None and operator_fee is not None:
                         stvault.staking_apr = staking_apr
                         stvault.unsettled_lido_fee = lido_fee
                         stvault.undisbursed_operator_fee = operator_fee
