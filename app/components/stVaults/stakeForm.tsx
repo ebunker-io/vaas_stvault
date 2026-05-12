@@ -24,8 +24,18 @@ const formatWeiToEth = (wei: string) => {
 
 const formatWeiToEthFull = (wei: string) => {
   if (!wei || wei === '0') return '0';
-   
+
   return formatEther(BigInt(wei));
+}
+
+// Supply Max 时从钱包余额里预留出来的 gas buffer：5e15 wei = 0.005 ETH。
+// fund tx 在 contract call + 可能的 report_tx 串联下，按 20-50 gwei gas price
+// 估算需要 ~0.002-0.005 ETH，留 0.005 作为安全余量。直接把整个 balance 当作
+// Max 会让用户提交后钱包报"insufficient funds for gas"。
+const GAS_RESERVE_WEI = BigInt('5000000000000000')
+
+const subtractGasReserve = (balance: bigint): bigint => {
+  return balance > GAS_RESERVE_WEI ? balance - GAS_RESERVE_WEI : BigInt(0)
 }
 
 const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }) => {
@@ -70,15 +80,17 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
     if (activeTab === 1) {
       return withdrawDataResult?.withdrawable_value ? formatWeiToEth(withdrawDataResult.withdrawable_value) : '0.0000'
     }
-    // return supplyDataResult?.balance ? formatWeiToEth(supplyDataResult.balance) : '0.0000'
-    return balance?.value ? formatWeiToEth(balance.value.toString()) : '0.0000'
+    // Supply: 从用户钱包 ETH 余额里预留 gas，不能把整个 balance 塞进 value
+    if (!balance?.value) return '0.0000'
+    return formatWeiToEth(subtractGasReserve(balance.value).toString())
   }
 
   const getMaxValueFull = () => {
     if (activeTab === 1) {
       return withdrawDataResult?.withdrawable_value ? formatWeiToEthFull(withdrawDataResult.withdrawable_value) : '0'
     }
-    return balance?.value ? formatWeiToEthFull(balance.value.toString()) : '0'
+    if (!balance?.value) return '0'
+    return formatWeiToEthFull(subtractGasReserve(balance.value).toString())
   }
 
   const isValidAmount = () => {
@@ -334,7 +346,9 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
 
   const executeNextTransaction = useCallback((transactions: any[], index: number) => {
     if (index >= transactions.length) {
-      // 所有交易已完成
+      // 所有交易已完成。正常流程不会走到这里（最后一笔通过 lastTxHash +
+      // useWaitForTransactionReceipt 由 isReceiptSuccess effect 收尾），保留作为
+      // 防御性兜底；刷新清单需与 isReceiptSuccess effect 一致，避免漏刷余额。
       setLoading(false);
       setPendingTransactions([]);
       setCurrentTxIndex(0);
@@ -342,7 +356,9 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
       setTimeout(() => {
         if (data?.vault) {
           refreshVault();
+          refreshWithdraw();
         }
+        refetchBalance();
       }, 3000);
       return;
     }
@@ -365,7 +381,7 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
       setPendingTransactions([]);
       setCurrentTxIndex(0);
     }
-  }, [sendTransaction, data?.vault, refreshVault])
+  }, [sendTransaction, data?.vault, refreshVault, refreshWithdraw, refetchBalance])
 
   const handleTransaction = async (apiData: any, apiError: any, setParams: (value: null) => void) => {
     if (apiError) {
