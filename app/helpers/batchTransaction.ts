@@ -24,10 +24,13 @@ export function parseSendCallsResult(result: any): { batchId?: string; txHash?: 
 }
 
 /** 判断轮询状态是否成功 */
+// PENDING 不算成功 —— 它的语义是"已提交到 mempool、未上链"。
+// 若把它当 success，调用方会在 tx 实际未确认时就弹"操作成功"，
+// 之后若 tx revert 用户已经离开页面，账面和实际状态不一致。
+// 让 PENDING 落到"既非 success 也非 fail"的桶里，轮询循环继续。
 export function isSuccessStatus(status: any): boolean {
   return status === 200 ||
     status === 'CONFIRMED' ||
-    status === 'PENDING' ||
     status === 'SUCCESS'
 }
 

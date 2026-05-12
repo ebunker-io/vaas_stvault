@@ -201,7 +201,8 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
         
         // 轮询查询 batch 状态，最多尝试 10 次
         let attempts = 0
-        const maxAttempts = 10
+        // 30 × 2s = 60s polling, 留够 ~5 个 block 的链上确认时间
+        const maxAttempts = 30
         const pollInterval = 2000 // 2 秒
 
         while (attempts < maxAttempts && (!txHash || txHash === batchId)) {
@@ -220,9 +221,9 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
             // 从状态中提取交易 hash
             if (statusResult && typeof statusResult === 'object') {
               // 检查状态：支持数字状态码 200（成功）或字符串状态
-              const isSuccess = statusResult.status === 200 || 
-                               statusResult.status === 'CONFIRMED' || 
-                               statusResult.status === 'PENDING' ||
+              // PENDING 是"已提交、未上链"，不应判 success；让循环继续 poll 等待真正的确认状态
+              const isSuccess = statusResult.status === 200 ||
+                               statusResult.status === 'CONFIRMED' ||
                                statusResult.status === 'SUCCESS'
 
               if (isSuccess) {

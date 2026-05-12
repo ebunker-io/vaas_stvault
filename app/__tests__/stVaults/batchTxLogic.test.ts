@@ -71,7 +71,8 @@ describe('parseSendCallsResult', () => {
 describe('isSuccessStatus', () => {
   it('200 → true', () => expect(isSuccessStatus(200)).toBe(true))
   it('CONFIRMED → true', () => expect(isSuccessStatus('CONFIRMED')).toBe(true))
-  it('PENDING → true', () => expect(isSuccessStatus('PENDING')).toBe(true))
+  // PENDING 是"已提交未上链"，明确不算 success（避免轮询过早判定成功导致 false-positive UI）
+  it('PENDING → false', () => expect(isSuccessStatus('PENDING')).toBe(false))
   it('SUCCESS → true', () => expect(isSuccessStatus('SUCCESS')).toBe(true))
   it('FAILED → false', () => expect(isSuccessStatus('FAILED')).toBe(false))
   it('500 → false', () => expect(isSuccessStatus(500)).toBe(false))

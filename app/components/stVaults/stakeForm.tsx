@@ -204,7 +204,8 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
         console.log('Result contains batch ID, querying status to get transaction hash...')
 
         let attempts = 0
-        const maxAttempts = 10
+        // 30 × 2s = 60s polling, 留够 ~5 个 block 的链上确认时间
+        const maxAttempts = 30
         const pollInterval = 2000
 
         while (attempts < maxAttempts && (!txHash || txHash === batchId)) {
@@ -219,9 +220,9 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
             console.log(`wallet_getCallsStatus result (attempt ${attempts + 1}):`, statusResult)
 
             if (statusResult && typeof statusResult === 'object') {
+              // PENDING 是"已提交、未上链"，不应判 success；让循环继续 poll 等待真正的确认状态
               const isSuccess = statusResult.status === 200 ||
                 statusResult.status === 'CONFIRMED' ||
-                statusResult.status === 'PENDING' ||
                 statusResult.status === 'SUCCESS'
 
               if (isSuccess) {
