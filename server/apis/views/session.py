@@ -4,13 +4,25 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from apis.results import Result, Failure
+from apis.util.rate_limit import is_allowed as rate_limit_is_allowed, client_ip
 from validators.models import Customer, PoolId
 from apis import utils
 from validators.tool.address_util import AddressUtil
 
 
+# Per-IP login attempt budget. Login does signature recovery + DB lookup + JWT mint;
+# left unbounded an attacker can hammer it to flood DB and brute-force captcha codes.
+SESSION_LOGIN_LIMIT = 10
+SESSION_LOGIN_WINDOW = 60  # seconds
+
+
 class SessionApiView(APIView):
     def post(self, request, *args, **kwargs):
+        ip = client_ip(request)
+        if not rate_limit_is_allowed('session-login', ip, SESSION_LOGIN_LIMIT, SESSION_LOGIN_WINDOW):
+            logging.warning('session login rate-limited ip=%s', ip)
+            result = Result(code=429, msg=Result.get_msg('too_many_requests', request.headers.get('Accept-Language') or 'en', [], request), success=False)
+            return Response(result.__dict__, status=status.HTTP_200_OK, content_type="application/json")
         items: dict = request.data
         if not utils.verify_params(items, ['captcha', 'sign', 'address']):
             result = Result(code=400, msg=Result.get_msg('invalid_params', request.headers.get('Accept-Language') or 'en', ['captcha', 'sign', 'address'], request), success=False)

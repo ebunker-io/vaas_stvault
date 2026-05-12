@@ -10,11 +10,12 @@ import logging
 
 import requests
 from django.conf import settings
-from django.core.cache import cache
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
+
+from apis.util.rate_limit import is_allowed as rate_limit_is_allowed, client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -52,27 +53,6 @@ RPC_UPSTREAM_TIMEOUT = 10 # seconds
 RPC_MAX_BATCH = 20        # max methods per batch
 
 
-def _client_ip(request):
-    return request.META.get('REMOTE_ADDR', '') or 'unknown'
-
-
-def _rate_limit_ok(ip):
-    """Fixed-window per-IP counter. Fails open if the cache is unavailable."""
-    key = f'rpc-proxy:rate:{ip}'
-    try:
-        if cache.add(key, 1, RPC_RATE_WINDOW):
-            return True
-        try:
-            count = cache.incr(key)
-        except ValueError:
-            cache.set(key, 1, RPC_RATE_WINDOW)
-            return True
-        return count <= RPC_RATE_LIMIT
-    except Exception as e:
-        logger.warning(f'RPC proxy rate-limit cache error: {e}')
-        return True
-
-
 def _jsonrpc_error(req_id, code, message):
     return {'jsonrpc': '2.0', 'id': req_id, 'error': {'code': code, 'message': message}}
 
@@ -90,8 +70,8 @@ class _RpcProxyView(View):
             logger.error(f'RPC proxy upstream not configured: {self.upstream_setting_key}')
             return JsonResponse(_jsonrpc_error(None, -32603, 'Proxy not configured'), status=503)
 
-        ip = _client_ip(request)
-        if not _rate_limit_ok(ip):
+        ip = client_ip(request)
+        if not rate_limit_is_allowed('rpc-proxy', ip, RPC_RATE_LIMIT, RPC_RATE_WINDOW):
             logger.warning(f'RPC proxy rate-limited ip={ip}')
             return JsonResponse(_jsonrpc_error(None, -32005, 'Too many requests'), status=429)
 

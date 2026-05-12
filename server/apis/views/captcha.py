@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from apis.results import Result
 from apis import utils
+from apis.util.rate_limit import is_allowed as rate_limit_is_allowed, client_ip
 from django.db import transaction
 from validators.models import Captcha, Customer, PoolId
 from validators.tool.address_util import AddressUtil
@@ -15,8 +16,32 @@ from validators.notification.notification import NotificationType
 logger = logging.getLogger(__name__)
 
 
+# Per-IP rate limits. Each captcha POST inserts/updates a Captcha row in DB,
+# so an unauthenticated flood directly translates into DB write load.
+# Email captcha is stricter because it also fires off an SMTP send.
+CAPTCHA_LOGIN_LIMIT = 20
+CAPTCHA_LOGIN_WINDOW = 60   # seconds
+CAPTCHA_EMAIL_LIMIT = 10
+CAPTCHA_EMAIL_WINDOW = 60   # seconds
+CAPTCHA_WITHDRAW_LIMIT = 20
+CAPTCHA_WITHDRAW_WINDOW = 60  # seconds
+
+
+def _rate_limited_response(request):
+    result = Result(
+        code=429,
+        msg=Result.get_msg('too_many_requests', request.headers.get('Accept-Language') or 'en', [], request),
+        success=False,
+    )
+    return Response(result.__dict__, status=status.HTTP_200_OK, content_type="application/json")
+
+
 class CaptchaApiView(APIView):
     def post(self, request, *args, **kwargs):
+        ip = client_ip(request)
+        if not rate_limit_is_allowed('captcha-login', ip, CAPTCHA_LOGIN_LIMIT, CAPTCHA_LOGIN_WINDOW):
+            logger.warning('captcha-login rate-limited ip=%s', ip)
+            return _rate_limited_response(request)
         items: dict = request.data
         if not utils.verify_params(items, ['address']) or items['address'] == '' or not re.match("^0x[a-fA-F0-9]{40}$", items['address']):
             result = Result(code=400, msg=Result.get_msg('invalid_params', request.headers.get('Accept-Language') or 'en', ['address'], request), success=False)
@@ -52,6 +77,10 @@ class CaptchaApiView(APIView):
 class EmailCaptchaApiView(APIView):
     @transaction.atomic
     def post(self, request, *args, **kwargs):
+        ip = client_ip(request)
+        if not rate_limit_is_allowed('captcha-email', ip, CAPTCHA_EMAIL_LIMIT, CAPTCHA_EMAIL_WINDOW):
+            logger.warning('captcha-email rate-limited ip=%s', ip)
+            return _rate_limited_response(request)
         current_user = utils.verify_token(request)
         if not isinstance(current_user, Customer):
             return current_user
@@ -89,6 +118,10 @@ class EmailCaptchaApiView(APIView):
 
 class WithdrawAddressCaptchaApiView(APIView):
     def post(self, request, *args, **kwargs):
+        ip = client_ip(request)
+        if not rate_limit_is_allowed('captcha-withdraw', ip, CAPTCHA_WITHDRAW_LIMIT, CAPTCHA_WITHDRAW_WINDOW):
+            logger.warning('captcha-withdraw rate-limited ip=%s', ip)
+            return _rate_limited_response(request)
         current_user = utils.verify_token(request)
         if not isinstance(current_user, Customer):
             return current_user
