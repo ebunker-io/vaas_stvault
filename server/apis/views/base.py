@@ -124,6 +124,21 @@ class BaseApiView(APIView):
             return False, current_user
         return True, current_user
 
+    def validate_eth_address(self, request, items, key):
+        """
+        校验 items[key] 是合法的以太坊地址。返回 (True, checksum_address) 或
+        (False, error_response)，调用风格与 verify_auth / validate_params 保持一致。
+
+        直接 `Web3Tool.check_address(items.get(...))` 在坏输入上会抛 InvalidAddress，
+        被 BaseApiView.dispatch 兜底成 500 'system_error'，让用户看不到真实原因。
+        这个 helper 把校验前置成 400 'invalid_params'，明确指出哪个字段不合法。
+        """
+        from validators.tool.web3 import Web3Tool  # lazy: 避免 module-load 期的循环
+        raw = items.get(key)
+        if not Web3Tool.is_address(raw):
+            return False, self.error_response(request, 400, 'invalid_params', [key])
+        return True, Web3Tool.check_address(raw)
+
     def validate_params(self, request, required_params: list, custom_error_fields: list = None, request_type: REQUEST_TYPE = REQUEST_TYPE.POST):
         """
         验证请求参数是否齐全

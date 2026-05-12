@@ -38,10 +38,9 @@ class StVaultCreateApiView(BaseApiView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
-        if not Web3Tool.is_address(from_address):
-            return self.error_response(request, 400, 'invalid_params', ['from_address'])
-        from_address = Web3Tool.check_address(from_address)
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         if current_user.reward_address.lower() != from_address.lower():
             return self.error_response(request, 403, 'forbidden')
         vault_owner = from_address
@@ -160,7 +159,9 @@ class DashboardSupplyApiView(BaseApiView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         vault = Web3Tool.check_address(items.get('vault'))
         amount = items.get('amount')
 
@@ -204,7 +205,9 @@ class DashboardWithdrawApiView(BaseApiView):
         is_valid, items = self.validate_params(request, ['from_address', 'vault', 'amount'])
         if not is_valid:
             return items
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         vault = Web3Tool.check_address(items.get('vault'))
         amount = items.get('amount')
         recipient = Web3Tool.check_address(from_address)
@@ -256,7 +259,9 @@ class DashboardMintstETHApiView(BaseApiView):
         if not is_valid:
             return items
 
-        from_address = Web3Tool.check_address(items.get('from_address'))
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         vault = Web3Tool.check_address(items.get('vault'))
         amount = items.get('amount')
         recipient = Web3Tool.check_address(from_address)
@@ -326,7 +331,9 @@ class DashboardRepaystETHApiView(BaseApiView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         vault = Web3Tool.check_address(items.get('vault'))
         amount_steth = items.get('amount')
 
@@ -513,7 +520,9 @@ class StVaultRefreshMintBalanceApiView(BaseApiView):
 #         if not is_valid:
 #             return items
 
-#         from_address = items.get('from_address')
+#         is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
 #         dashboard = items.get('dashboard')
 #         pdg_policy = items.get('pdg_policy')
 
@@ -547,7 +556,9 @@ class StVaultRefreshMintBalanceApiView(BaseApiView):
 #         if not is_valid:
 #             return items
 
-#         from_address = items.get('from_address')
+#         is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
 #         dashboard = items.get('dashboard')
 #         deposits_payload = items.get('deposits')
 
@@ -668,7 +679,9 @@ class PDGGuarantorApiView(BasePDGView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         guarantor = items.get('guarantor')
 
         is_paused, paused_response = self.check_contract_paused(request)
@@ -690,7 +703,9 @@ class PDGDepositorApiView(BasePDGView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         depositor = items.get('depositor')
 
         is_paused, paused_response = self.check_contract_paused(request)
@@ -713,7 +728,9 @@ class PDGGuaranteeApiView(BasePDGView):
             return items
 
         items = items
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         node_operator = items.get('node_operator')
         amount = items.get('amount')
 
@@ -739,7 +756,9 @@ class PDGPredepositApiView(BasePDGView):
             return items
 
         items = items
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         vault = items.get('vault')
         deposits = items.get('deposits')
         if not deposits:
@@ -821,7 +840,9 @@ class PDGProveWCAndTopUpApiView(BasePDGView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         indexes = items.get('indexes')
         amounts = items.get('amounts')
         if not indexes or not amounts:
@@ -869,7 +890,9 @@ class PDGTopUpApiView(BasePDGView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         topups = items.get('topups')
         if not topups:
             raise Exception('topups is empty')
@@ -905,7 +928,9 @@ class PDGWithdrawNOBalanceApiView(BasePDGView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         node_operator = items.get('node_operator')
         amount = items.get('amount')
         recipient = items.get('recipient')
@@ -936,7 +961,9 @@ class PDGRequestValidatorExitApiView(BasePDGView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         vault = Web3Tool.check_address(items.get('vault'))
         pubkey = items.get('pubkey')
         # 查询vault是否存在
@@ -966,7 +993,9 @@ class PDGProveUnknownValidatorApiView(BasePDGView):
         if not is_valid:
             return items
 
-        from_address = items.get('from_address')
+        is_valid, from_address = self.validate_eth_address(request, items, 'from_address')
+        if not is_valid:
+            return from_address
         index = items.get('index')
         staking_vault = items.get('staking_vault')
 
