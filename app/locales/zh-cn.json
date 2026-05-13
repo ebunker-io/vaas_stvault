@@ -10,6 +10,7 @@
   "account_setting": "账户设置",
   "logout": "退出登录",
   "disconnect": "断开钱包",
+  "wallet_disconnected_tip": "钱包已断开连接，请重新连接以继续操作。",
   "note": "说明",
   "web3_login": "Web3登录",
   "login_desc": "登录需要连接钱包并签名一条信息，这不是一个交易，并不会被广播，不会使用或消耗您的资金。 这不会影响您的钱包安全，请放心登录。 : )",

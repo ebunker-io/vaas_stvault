@@ -65,6 +65,7 @@ MIDDLEWARE = [
     'django_prometheus.middleware.PrometheusAfterMiddleware',
     'apis.util.api_time_middleware.ApiTimeMiddleware',
     'apis.util.exception_middleware.ExceptionMiddleware',
+    'apis.util.security_headers_middleware.SecurityHeadersMiddleware',
 ]
 IMPORT_EXPORT_USE_TRANSACTIONS = True
 
@@ -185,6 +186,9 @@ EMAIL_HOST_PASSWORD = os.environ["BACKEND_EMAIL_HOST_PASSWORD"]
 EMAIL_FROM = os.environ["BACKEND_EMAIL_FROM"]
 EMAIL_USE_TLS = True
 EMAIL_SEND_ENABLE = True
+
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+SECURE_CONTENT_TYPE_NOSNIFF = True
 
 CSRF_TRUSTED_ORIGINS = os.getenv("BACKEND_CSRF_TRUSTED_ORIGINS").split(",")
 CORS_ALLOW_CREDENTIALS = True

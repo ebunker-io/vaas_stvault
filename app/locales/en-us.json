@@ -10,6 +10,7 @@
   "account_setting": "Account Settings",
   "logout": "Log Out",
   "disconnect": "Disconnect",
+  "wallet_disconnected_tip": "Wallet disconnected. Please reconnect to continue.",
   "note": "Note",
   "web3_login": "Web3 Log In",
   "login_desc": "You are connecting your wallet and signing one message to login to Ebunker.io.\nThis is not a transaction and will not be broadcast or use/cost your fund. :)",

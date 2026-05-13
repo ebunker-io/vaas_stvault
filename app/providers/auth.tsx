@@ -6,6 +6,8 @@ import { useAccount, useAccountEffect, useDisconnect, useSignMessage } from 'wag
 import { useFetchCaptcha } from '../hooks/useFetchCaptcha'
 import { getHost } from '../helpers/request'
 import { useLockFn } from 'ahooks'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'react-toastify'
 
 export interface AuthContextInterface {
   isLoggedIn: boolean | undefined
@@ -30,6 +32,7 @@ export const AuthContext = createContext<AuthContextInterface>({
 })
 
 export const AuthProvider = ({ children }: { children: ReactNode }): JSX.Element => {
+  const { t } = useTranslation()
   const [refreshKey, setRefreshKey] = useState(0)
   const { userInfo, isLoading: isUserInfoLoading } = useGetInfo(refreshKey)
   const fetchCaptcha = useFetchCaptcha()
@@ -37,13 +40,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }): JSX.Element
   const [isLoggingIn, setLoggingIn] = useState(false)
   const { signMessageAsync } = useSignMessage()
   const { disconnect } = useDisconnect()
-//   useAccountEffect({
-//     onDisconnect() {
-//       // setLoggedIn(false)
-//       // localStorage.removeItem('token')
-//       localStorage.removeItem('address')
-//     },
-//   })
+
+  useAccountEffect({
+    // 用户主动登出会先清 token 再调 disconnect()；如果走到这里 token 还在，说明是钱包侧非预期掉线
+    // （WalletConnect session 心跳超时、injected provider 后台休眠等），需要清登录态并提示用户，
+    // 避免 UI 继续按"已登录"渲染、把可点击的事务按钮露出来误导用户。
+    onDisconnect() {
+      const wasActiveSession = localStorage.getItem('token') !== null
+      localStorage.removeItem('token')
+      localStorage.removeItem('address')
+      sessionStorage.removeItem('stVaultData')
+      setLoggedIn(false)
+      if (wasActiveSession) {
+        toast.warn(t('wallet_disconnected_tip'))
+      }
+    },
+  })
 
   const [orderRefreshKey, setOrderRefreshKey] = useState(0)
   const { data: order, error, isLoading } = useGetCurrentValidatorOrder(orderRefreshKey)
