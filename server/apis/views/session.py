@@ -50,6 +50,7 @@ class SessionApiView(APIView):
             return Response(result.__dict__, status=status.HTTP_200_OK, content_type="application/json")
 
         if utils.verifity_sign(items['captcha'], items['sign'], AddressUtil.address_add_0x_and_lower(items['address'])):
+            utils.extend_login_captcha(customer)
             data = {
                 "token": utils.generate_jwt_auth_token(address=AddressUtil.address_add_0x_and_lower(items['address']),
                                                        pool_name=pool_id.name),

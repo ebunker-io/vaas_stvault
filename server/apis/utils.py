@@ -35,6 +35,23 @@ def generate_jwt_auth_token(address, pool_name):
         settings.JWT['SECRET_KEY'], algorithm='HS256')
 
 
+def extend_login_captcha(customer):
+    """
+    把 login captcha 的过期时间延长到与 JWT 一致，让它在登录后变成服务端会话标记。
+
+    背景：login captcha 创建时 expired_at = time.time() + 300（5min）——这是签名 challenge
+    合理的短命寿命。但 verify_token 在每次请求都会再校验这条 captcha 仍未过期，等于把短命
+    challenge 当成 session 用，导致用户登录 5min 后所有接口 401。
+
+    修复：登录验签成功后，延长这条 captcha 的有效期到 token_expires_in（默认 24h）。这样：
+      - 签名 challenge 阶段仍 5min 短命（防 replay）
+      - 登录后变成 session 标记（与 JWT 同寿命）
+      - DELETE /apis/sessions 仍可通过删除该 captcha 来撤销服务端 session
+    """
+    expires_in = int(Config.get_by_key('token_expires_in', 6000))
+    customer.captcha_set.filter(kind='login').update(expired_at=time.time() + expires_in)
+
+
 def verify_jwt_auth_token(encoded_jwt):
     """
     Verify JWT signature, algorithm, and expiration.
