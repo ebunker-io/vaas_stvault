@@ -31,7 +31,7 @@ class AwsV4SignAuth(authentication.BaseAuthentication):
         access_key, datestamp, aws_region, service, aws4_request = credential.split("/")
         req_signature_key, req_signature = req_signature.split("=")
 
-        if access_key != ACCESS_KEY:
+        if not hmac.compare_digest(access_key.encode('utf-8'), ACCESS_KEY.encode('utf-8')):
             raise exceptions.AuthenticationFailed('Invalidate AwsV4 access_key.')
 
         amzdate = request.META.get('HTTP_X_AMZ_DATE')
@@ -75,7 +75,8 @@ class AwsV4SignAuth(authentication.BaseAuthentication):
                              string_to_sign_utf8,
                              hashlib.sha256).hexdigest()
 
-        if signature != req_signature:
+        # 常量时间比较：避免攻击者通过逐字节响应时长差异（短路提前返回）逐位猜出有效签名。
+        if not hmac.compare_digest(signature.encode('utf-8'), req_signature.encode('utf-8')):
             raise exceptions.AuthenticationFailed('Invalidate AwsV4 signature.')
         else:
             return "user", "token"
