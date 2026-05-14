@@ -22,8 +22,8 @@ class ExceptionMiddleware(CommonMiddleware):
             'path': request.path,
             'method': request.method,
             'ip': request.META.get('REMOTE_ADDR'),
-            'GET': request.GET,
-            'POST': request.POST,
+            'GET': list(request.GET.keys()),
+            'POST': list(request.POST.keys()),
             'time': datetime.datetime.now(),
         }
         Notification.send_template(

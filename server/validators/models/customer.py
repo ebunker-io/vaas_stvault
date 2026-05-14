@@ -95,7 +95,6 @@ class Customer(models.Model):
         """
         captcha = self.captcha_set.filter(
             kind=kind, code=code, expired_at__gte=time.time()).first()
-        print('verify_captcha', captcha)
         if not captcha:
             return False
         return True
