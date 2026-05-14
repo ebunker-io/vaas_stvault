@@ -13,6 +13,7 @@ import VaultFailedModal from '../modals/vault-failed';
 import VaultSuccessModal from '../modals/vault-success';
 import EthIcon from '../../assets/images/stvault/icon-eth.png';
 import { formatEther } from 'viem';
+import { formatTransactionError } from '../../helpers/chain';
 const formatWeiToEth = (wei: string) => { 
   const eth = formatWeiToEthFull(wei);
   const arr = eth.split('.');
@@ -653,7 +654,7 @@ const StVaultsForm = ({ address, list, apr }: { address: `0x${string}` | undefin
         {address ? t('stvaults_stake') : t('login')}
         {isLoading && <Loader2 className='w-4 h-4 animate-spin' />}
       </Button>
-      <VaultFailedModal onClose={() => setShowFailedModal(false)} message={supplyError?.message || txError?.message} open={showFailedModal} />
+      <VaultFailedModal onClose={() => setShowFailedModal(false)} message={formatTransactionError(supplyError || txError, t)} open={showFailedModal} />
       <VaultSuccessModal onClose={() => setShowSuccessModal(false)} onView={() => { router.push(`/dashboard?type=lido`) }} onConfirm={() => { setShowSuccessModal(false) }} open={showSuccessModal} title={String(t('stvaults_vault_stake_success'))} subtitle={String(t('stvaults_vault_stake_success_desc'))} />
     </Box>
   )

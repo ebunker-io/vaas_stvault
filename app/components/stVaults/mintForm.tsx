@@ -11,6 +11,7 @@ import VaultFailedModal from '../modals/vault-failed'
 import VaultSuccessModal from '../modals/vault-success'
 import { useTranslation } from 'react-i18next'
 import { formatEther } from 'viem'
+import { formatTransactionError } from '../../helpers/chain'
 
 
 const formatWeiToEth = (wei: string) => { 
@@ -408,7 +409,7 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
       setLoading(false);
       setPendingTransactions([]);
       setCurrentTxIndex(0);
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to send transaction');
+      setErrorMessage(formatTransactionError(error, t));
       setShowFailedModal(true);
     }
   }, [sendTransaction, data?.vault, refreshVault, ethBalance])
@@ -584,7 +585,7 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
       setCurrentTxIndex(0);
       lastTxDataRef.current = null;
       console.error('Error:', error);
-      setErrorMessage(error.message?.split('.')[0] || '');
+      setErrorMessage(formatTransactionError(error, t));
       setShowFailedModal(true);
     }
   }, [mintError, repayError, txError])

@@ -364,6 +364,7 @@
   "creation_checking_error": "检查出错，请稍后重试.",
   "wallet_network_unsupported": "请先在钱包中添加 {{target}} 网络。",
   "wallet_action_failed": "钱包操作失败，请重试。",
+  "transaction_failed_generic": "交易失败，请重试。",
   "switch_network_cta": "切换到 {{target}}",
   "chain_network_loading": "以太坊网络加载中，再试一次",
   "wallet_switch_network_error": "当前在 {{current}}，请切换到 {{target}} 后继续。",

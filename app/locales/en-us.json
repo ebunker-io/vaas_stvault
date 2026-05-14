@@ -365,6 +365,7 @@
   "creation_checking_error": "Checking error, please try again later.",
   "wallet_network_unsupported": "Please add {{target}} to your wallet to continue.",
   "wallet_action_failed": "Wallet action failed. Please try again.",
+  "transaction_failed_generic": "Transaction failed. Please try again.",
   "switch_network_cta": "Switch to {{target}}",
   "chain_network_loading": "Ethereum network loading,try again",
   "wallet_switch_network_error": "You're on {{current}}. Please switch to {{target}} to continue.",

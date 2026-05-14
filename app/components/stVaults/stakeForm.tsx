@@ -12,6 +12,7 @@ import VaultSuccessModal from '../modals/vault-success'
 import { useTranslation } from 'react-i18next'
 import RewardRate from './RewardRate'
 import { formatEther } from 'viem'
+import { formatTransactionError } from '../../helpers/chain'
 
 const formatWeiToEth = (wei: string) => { 
   const eth = formatWeiToEthFull(wei);
@@ -546,7 +547,7 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
       setLastTxHash(undefined);
       lastTxDataRef.current = null;
       console.error('Error:', error);
-      setErrorMessage(error.message?.split('.')[0] || '');
+      setErrorMessage(formatTransactionError(error, t));
       setShowFailedModal(true);
     }
   }, [withdrawError, supplyError, txError])
