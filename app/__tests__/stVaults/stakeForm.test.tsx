@@ -132,9 +132,9 @@ describe('StakeForm 渲染', () => {
     expect(screen.getByText('stvaults_reward_rate')).toBeInTheDocument()
   })
 
-  it('data 为 null 时应显示默认占位地址', () => {
+  it('data 为 null 时不应显示伪占位地址', () => {
     render(<StakeForm tab={0} data={null} />)
-    expect(screen.getByText('0x3m2r3ujefijfiojwf023ruf893ujf9ujoehjfo2')).toBeInTheDocument()
+    expect(screen.queryByText('0x3m2r3ujefijfiojwf023ruf893ujf9ujoehjfo2')).not.toBeInTheDocument()
   })
 })
 

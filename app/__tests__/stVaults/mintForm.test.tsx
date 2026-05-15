@@ -138,9 +138,9 @@ describe('MintForm 渲染', () => {
     expect(mintableElements.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('data 为 null 时应显示默认占位地址', () => {
+  it('data 为 null 时不应显示伪占位地址', () => {
     render(<MintForm tab={0} data={null} />)
-    expect(screen.getByText('0x3m2r3ujefijfiojwf023ruf893ujf9ujoehjfo2')).toBeInTheDocument()
+    expect(screen.queryByText('0x3m2r3ujefijfiojwf023ruf893ujf9ujoehjfo2')).not.toBeInTheDocument()
   })
 })
 

@@ -630,7 +630,7 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
               textOverflow: 'ellipsis',
             }}
           >
-            {data?.vault || '0x3m2r3ujefijfiojwf023ruf893ujf9ujoehjfo2'}
+            {data?.vault || ''}
           </Typography>
         </Box>
       </Box>
