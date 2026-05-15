@@ -763,27 +763,19 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
           }
 
           if (activeTab === 0) {
-            // if (supplyData) {
-            //   handleTransaction(supplyData, supplyError, setSupplyParams);
-            // } else {
             setLoading(true);
             setSupplyParams({
               from_address: address,
               vault: data.vault,
               amount: amount.toString(),
             });
-            // }
           } else if (activeTab === 1) {
-            // if (withdrawData) {
-            //   handleTransaction(withdrawData, withdrawError, setWithdrawParams);
-            // } else {
             setLoading(true);
             setWithdrawParams({
               from_address: address,
               vault: data.vault,
               amount: amount.toString(),
             });
-            // }
           }
         }}
         disabled={!address || isLoading || !isValidAmount()}

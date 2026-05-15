@@ -820,27 +820,19 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
           }
 
           if (activeTab === 0) {
-            // if (mintData && mintParams) {
-            //   handleTransaction(mintData, mintError, setMintParams);
-            // } else {
-              setLoading(true);
-              setMintParams({
-                from_address: address,
-                vault: data.vault,
-                amount: amount.toString(),
-              });
-            // }
+            setLoading(true);
+            setMintParams({
+              from_address: address,
+              vault: data.vault,
+              amount: amount.toString(),
+            });
           } else if (activeTab === 1) {
-            // if (repayData && repayParams) {
-            //   handleTransaction(repayData, repayError, setRepayParams);
-            // } else {
-              setLoading(true);
-              setRepayParams({
-                from_address: address,
-                vault: data.vault,
-                amount: amount.toString(),
-              });
-            // }
+            setLoading(true);
+            setRepayParams({
+              from_address: address,
+              vault: data.vault,
+              amount: amount.toString(),
+            });
           }
         }}
         disabled={!address || isLoading || !isValidAmount()}
