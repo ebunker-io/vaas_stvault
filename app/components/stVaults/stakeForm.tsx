@@ -183,7 +183,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
         atomicRequired: true, // 所有交易必须全部成功
       }
 
-      console.log('Using wallet_sendCalls to batch execute transactions:', requestParams)
 
       // 调用 wallet_sendCalls
       const result = await ethereum.request({
@@ -191,7 +190,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
         params: [requestParams],
       })
 
-      console.log('wallet_sendCalls result:', result)
 
       // 解析返回结果
       let batchId: string | undefined
@@ -214,7 +212,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
 
       // 如果返回的是 batch ID 而不是交易 hash，需要查询状态获取实际交易 hash
       if (!txHash || txHash === batchId) {
-        console.log('Result contains batch ID, querying status to get transaction hash...')
 
         let attempts = 0
         // 30 × 2s = 60s polling, 留够 ~5 个 block 的链上确认时间
@@ -230,7 +227,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
               params: [batchId],
             })
 
-            console.log(`wallet_getCallsStatus result (attempt ${attempts + 1}):`, statusResult)
 
             if (statusResult && typeof statusResult === 'object') {
               // PENDING 是"已提交、未上链"，不应判 success；让循环继续 poll 等待真正的确认状态
@@ -254,7 +250,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
                 }
 
                 if (!txHash && statusResult.status === 200) {
-                  console.log('Status is 200 but no transaction hash found, batch may be processing')
                 }
               }
 
@@ -294,7 +289,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
           }
 
           if (lastStatusResult && lastStatusResult.status === 200) {
-            console.log('Status is 200, batch transaction is successful but no hash found')
             setLoading(false)
             setWithdrawParams(null)
             setSupplyParams(null)
@@ -319,7 +313,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
         }
       }
 
-      console.log('Final transaction hash:', txHash)
 
       const isValidHash = txHash && typeof txHash === 'string' && txHash.startsWith('0x') && txHash.length === 66
 
@@ -375,7 +368,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
         // 在含 oracle proof / state-dependent 的 stVault tx 上估低导致 revert
         gas: transaction.gas ? BigInt(transaction.gas) : undefined,
       });
-      console.log(`Executing transaction ${index + 1}/${transactions.length}`);
     } catch (error) {
       console.error('Send transaction error:', error);
       setLoading(false);
@@ -396,7 +388,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
     }
 
     if (apiData && Array.isArray(apiData) && apiData.length > 0) {
-      console.log('StVault API response:', apiData);
       setLoading(true);
       setParams(null);
       setPendingTransactions(apiData);
@@ -407,32 +398,19 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
       const isMetaMaskWallet = isMetaMask()
       const shouldUseBatch = isMetaMaskWallet && apiData.length > 1
 
-      console.log('Is MetaMask wallet:', isMetaMaskWallet)
-      console.log('Transaction count > 1:', apiData.length > 1)
-      console.log('Should use batch execution:', shouldUseBatch)
 
       if (shouldUseBatch) {
-        console.log(`Using batch execution (sendCalls) for ${apiData.length} transactions`)
         try {
           const result = await executeBatchTransactions(apiData)
           if (result === 'batch_success') {
-            console.log('Batch transaction successful (status 200), no need to wait for receipt')
             return
           }
-          console.log('Batch execution initiated successfully')
         } catch (error: any) {
           console.error('Batch execution error:', error)
           console.error('Error details:', error.message, error.code)
-          console.log('Falling back to sequential execution')
           executeNextTransaction(apiData, 0)
         }
       } else {
-        if (!isMetaMaskWallet) {
-          console.log('Not using batch: Not MetaMask wallet')
-        } else if (apiData.length <= 1) {
-          console.log('Not using batch: Only 1 transaction')
-        }
-        console.log(`Using sequential execution for ${apiData.length} transaction(s)`)
         executeNextTransaction(apiData, 0)
       }
     }
@@ -452,7 +430,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
 
   useEffect(() => {
     if (txData && pendingTransactions.length > 0 && txData !== lastTxDataRef.current) {
-      console.log(`Transaction ${currentTxIndex + 1}/${pendingTransactions.length} sent successfully:`, txData);
       lastTxDataRef.current = txData;
 
       if (currentTxIndex + 1 < pendingTransactions.length) {
@@ -468,7 +445,6 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
   // 当前交易确认成功，发下一笔
   useEffect(() => {
     if (isCurrentReceiptSuccess && currentTxHash && currentTxIndex + 1 < pendingTransactions.length) {
-      console.log(`Transaction ${currentTxIndex + 1} confirmed, executing next transaction...`);
       const nextIndex = currentTxIndex + 1;
       setCurrentTxIndex(nextIndex);
       setCurrentTxHash(undefined);

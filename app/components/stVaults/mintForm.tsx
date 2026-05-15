@@ -164,7 +164,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
         atomicRequired: true, // 所有交易必须全部成功
       }
 
-      console.log('Using wallet_sendCalls to batch execute transactions:', requestParams)
 
       // 调用 wallet_sendCalls
       const result = await ethereum.request({
@@ -172,7 +171,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
         params: [requestParams],
       })
 
-      console.log('wallet_sendCalls result:', result)
 
       // 解析返回结果
       let batchId: string | undefined
@@ -198,7 +196,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
 
       // 如果返回的是 batch ID 而不是交易 hash，需要查询状态获取实际交易 hash
       if (!txHash || txHash === batchId) {
-        console.log('Result contains batch ID, querying status to get transaction hash...')
         
         // 轮询查询 batch 状态，最多尝试 10 次
         let attempts = 0
@@ -217,7 +214,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
               params: [batchId],
             })
 
-            console.log(`wallet_getCallsStatus result (attempt ${attempts + 1}):`, statusResult)
 
             // 从状态中提取交易 hash
             if (statusResult && typeof statusResult === 'object') {
@@ -250,7 +246,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
                 // 4. 如果 status 是 200 且没有找到 hash，说明交易已成功但可能还在确认中
                 // 这种情况下，我们可以使用 batch ID 作为标识，但需要特殊处理
                 if (!txHash && statusResult.status === 200) {
-                  console.log('Status is 200 but no transaction hash found, batch may be processing')
                   // 继续轮询，等待 hash 出现
                 }
               }
@@ -297,8 +292,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
 
           // 如果状态是 200（成功），即使没有交易 hash，也认为交易已成功
           if (lastStatusResult && lastStatusResult.status === 200) {
-            console.log('Status is 200, batch transaction is successful but no hash found')
-            console.log('This may be a batch operation that completes atomically')
             // 对于批量交易，如果状态是 200，直接标记为成功，不等待确认
             setLoading(false)
             setMintParams(null)
@@ -323,7 +316,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
         }
       }
 
-      console.log('Final transaction hash:', txHash)
 
       // 验证交易 hash 格式（应该是 0x 开头的 66 字符）
       const isValidHash = txHash && typeof txHash === 'string' && txHash.startsWith('0x') && txHash.length === 66
@@ -389,10 +381,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
       return;
     }
 
-    console.log(`Executing transaction ${index + 1}/${transactions.length}`);
-    console.log(`To: ${transaction.to}`);
-    console.log(`Value: ${txValue.toString()} wei (${(Number(txValue) / 1e18).toFixed(6)} ETH)`);
-    console.log(`Current ETH balance: ${ethBalance?.value ? (Number(ethBalance.value) / 1e18).toFixed(6) : '0'} ETH`);
 
     try {
       sendTransaction({
@@ -426,7 +414,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
     }
 
     if (apiData && Array.isArray(apiData) && apiData.length > 0) {
-      console.log('StVault API response:', apiData);
       setLoading(true);
       setParams(null);
       setPendingTransactions(apiData);
@@ -437,36 +424,22 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
       const isMetaMaskWallet:any = isMetaMask()
       const shouldUseBatch = isMetaMaskWallet && apiData.length > 1
 
-      console.log('Is MetaMask wallet:', isMetaMaskWallet)
-      console.log('Transaction count > 1:', apiData.length > 1)
-      console.log('Should use batch execution:', shouldUseBatch)
 
       if (shouldUseBatch) {
-        console.log(`Using batch execution (sendCalls) for ${apiData.length} transactions`)
         try {
           const result = await executeBatchTransactions(apiData)
           // 如果返回 'batch_success'，说明已经成功处理（status 200），不需要等待确认
           if (result === 'batch_success') {
-            console.log('Batch transaction successful (status 200), no need to wait for receipt')
             return // 直接返回，不执行后续逻辑
           }
-          console.log('Batch execution initiated successfully')
         } catch (error: any) {
           console.error('Batch execution error:', error)
           console.error('Error details:', error.message, error.code)
           
           // 如果批量执行失败，回退到顺序执行
-          console.log('Falling back to sequential execution')
           executeNextTransaction(apiData, 0)
         }
       } else {
-        if (!isMetaMaskWallet) {
-          console.log('Not using batch: Not MetaMask wallet')
-        } else if (apiData.length <= 1) {
-          console.log('Not using batch: Only 1 transaction')
-        }
-        console.log(`Using sequential execution for ${apiData.length} transaction(s)`)
-        // 开始执行第一个交易
         executeNextTransaction(apiData, 0)
       }
     }
@@ -491,7 +464,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
 
   useEffect(() => {
     if (txData && pendingTransactions.length > 0 && txData !== lastTxDataRef.current) {
-      console.log(`Transaction ${currentTxIndex + 1}/${pendingTransactions.length} sent successfully:`, txData);
       lastTxDataRef.current = txData;
 
       // 如果还有待执行的交易，等待当前交易确认后再执行下一个
@@ -510,7 +482,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
   // 当当前交易确认成功后，执行下一笔交易
   useEffect(() => {
     if (isCurrentReceiptSuccess && currentTxHash && currentTxIndex + 1 < pendingTransactions.length) {
-      console.log(`Transaction ${currentTxIndex + 1} confirmed, executing next transaction...`);
       const nextIndex = currentTxIndex + 1;
       setCurrentTxIndex(nextIndex);
       setCurrentTxHash(undefined); // 重置当前交易 hash
@@ -869,7 +840,6 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
                 vault: data.vault,
                 amount: amount.toString(),
               });
-              console.log('repayParams', amountNum);
             // }
           }
         }}

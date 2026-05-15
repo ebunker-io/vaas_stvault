@@ -41,7 +41,6 @@ const CreateVaultForm = ({ address, apr, count }: { address: `0x${string}` | und
   useEffect(() => {
     if (address) {
       setLoading(false);
-      console.log('StVault Dashboard API called with address:', address);
     }
   }, [address])
 
@@ -52,7 +51,6 @@ const CreateVaultForm = ({ address, apr, count }: { address: `0x${string}` | und
     }
 
     if (createData) {
-      console.log('StVault Create API response:', createData);
 
       try {
         setLoading(true);
@@ -72,14 +70,12 @@ const CreateVaultForm = ({ address, apr, count }: { address: `0x${string}` | und
 
   useEffect(() => {
     if (createData) {
-      console.log('StVault Create API response:', createData);
       handleCreateVault();
     }
   }, [createData])
 
   useEffect(() => {
     if (txData) {
-      console.log('Transaction sent successfully:', txData);
       // 设置交易 hash 并等待确认
       setLastTxHash(txData as `0x${string}`);
     }
