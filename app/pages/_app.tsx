@@ -13,7 +13,6 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AuthProvider } from '../providers/auth'
 import useInterval from '../hooks'
-import Script from 'next/script'
 import { config, defaultConfig, hoodiConfig } from '../providers/wagmi'
 import { lightTheme, RainbowKitProvider } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
@@ -55,21 +54,6 @@ export default function App({ Component, pageProps }: AppProps) {
   }, [])
   return (
     <>
-      <Script strategy='afterInteractive' src={`https://www.googletagmanager.com/gtag/js?id=G-JNPN3PJ4V7`} />
-      <Script
-        id='g-analysis'
-        strategy='afterInteractive'
-        dangerouslySetInnerHTML={{
-          __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-JNPN3PJ4V7', {
-              page_path: window.location.pathname,
-            });
-          `,
-        }}
-      />
       <WagmiProvider config={Number(ENV.chains[0].id) === 9999 ? defaultConfig : Number(ENV.chains[0].id) === 560048 ? hoodiConfig : config }>
         <QueryClientProvider client={queryClient}>
           <RainbowKitProvider theme={lightTheme()} modalSize='compact' >
