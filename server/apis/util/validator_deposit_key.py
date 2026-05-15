@@ -141,63 +141,56 @@ class ValidateDepositKey:
             withdrawal_credentials = bytes.fromhex(deposit_data_dict['withdrawal_credentials'])
             amount = deposit_data_dict['amount']
             signature = BLSSignature(bytes.fromhex(deposit_data_dict['signature']))
-            deposit_message_root = bytes.fromhex(deposit_data_dict['deposit_data_root'])
-            fork_version = bytes.fromhex(deposit_data_dict['fork_version'])
+            deposit_data_root = bytes.fromhex(deposit_data_dict['deposit_data_root'])
 
             # Verify pubkey
             if len(pubkey) != 48:
-                logger.warning('validator_deposit_key fail, len(pubkey) != 48')
+                logger.warning('verify_topup_deposit fail, len(pubkey) != 48')
                 return False
             if deposit_data_dict['network_name'] != settings.ETH['network']:
-                logger.warning('validator_deposit_key fail, error network_name, %s', deposit_data_dict['network_name'])
+                logger.warning('verify_topup_deposit fail, error network_name, %s', deposit_data_dict['network_name'])
                 return False
             if deposit_data_dict['network_name'] == 'mainnet':
                 if deposit_data_dict['fork_version'] != cls.MAINNET_FORK_VERSION:
-                    logger.warning('validator_deposit_key fail, unmatch fork_version for mainnet, %s', deposit_data_dict['fork_version'])
+                    logger.warning('verify_topup_deposit fail, unmatch fork_version for mainnet, %s', deposit_data_dict['fork_version'])
                     return False
             elif deposit_data_dict['network_name'] == 'goerli':
                 if deposit_data_dict['fork_version'] != cls.GOERLI_FORK_VERSION:
-                    logger.warning('validator_deposit_key fail, unmatch fork_version for goerli, %s', deposit_data_dict['fork_version'])
+                    logger.warning('verify_topup_deposit fail, unmatch fork_version for goerli, %s', deposit_data_dict['fork_version'])
                     return False
             elif deposit_data_dict['network_name'] == 'hoodi':
                 if deposit_data_dict['fork_version'] != cls.HOODI_FORK_VERSION:
-                    logger.warning('validator_deposit_key fail, unmatch fork_version for hoodi, %s', deposit_data_dict['fork_version'])
+                    logger.warning('verify_topup_deposit fail, unmatch fork_version for hoodi, %s', deposit_data_dict['fork_version'])
                     return False
             else:
-                logger.warning('validator_deposit_key fail, error network_name, %s', deposit_data_dict['network_name'])
+                logger.warning('verify_topup_deposit fail, error network_name, %s', deposit_data_dict['network_name'])
                 return False
-            # Verify withdrawal credential
-            if withdrawal_credentials[1:12] != b'\x00' * 11:
-                    logger.warning('validator_deposit_key fail, withdrawal_credentials[1:12] != b0')
-                    return False
+
+            # 0x02 top-up uses the canonical unsigned form: CompoundingDepositContract
+            # ignores withdrawal_credentials and signature for existing validators, so
+            # both must be all-zero bytes — reject anything else to prevent smuggling
+            # arbitrary bytes into stored deposit data.
+            if withdrawal_credentials != b'\x00' * 32:
+                logger.warning('verify_topup_deposit fail, withdrawal_credentials must be all zero')
+                return False
+            if signature != b'\x00' * 96:
+                logger.warning('verify_topup_deposit fail, signature must be all zero')
+                return False
 
             # Verify deposit amount
             if not MIN_DEPOSIT_AMOUNT <= amount <= MAX_DEPOSIT_AMOUNT_02:
-                    logger.warning('validator_deposit_key fail, amount out range')
-                    return False
+                logger.warning('verify_topup_deposit fail, amount out range')
+                return False
 
-            # Verify deposit signature && pubkey
-            deposit_message = DepositMessage(pubkey=pubkey, withdrawal_credentials=withdrawal_credentials, amount=amount)
-            domain = compute_deposit_domain(fork_version)
-            signing_root = compute_signing_root(deposit_message, domain)
-            # hex_signing_root = signing_root.hex()
-            # hex_signature = signature.hex()
-            # hex_pubkey = pubkey.hex()
-            # print(hex_signing_root)
-            # print(hex_signature)
-            # print(hex_pubkey)
-            # if not bls.Verify(pubkey, signing_root, signature):
-            #     logger.warning('validator_deposit_key fail, Verify deposit signature && pubkey')
-            #     return False
-            # Verify Deposit Root
+            # Verify deposit_data_root self-consistency
             signed_deposit = DepositData(
                 pubkey=pubkey,
                 withdrawal_credentials=withdrawal_credentials,
                 amount=amount,
                 signature=signature,
             )
-            if not signed_deposit.hash_tree_root == deposit_message_root:
-                logger.warning('validator_deposit_key fail, Verify Deposit Root')
+            if not signed_deposit.hash_tree_root == deposit_data_root:
+                logger.warning('verify_topup_deposit fail, Verify Deposit Root')
                 return False
         return True
 
