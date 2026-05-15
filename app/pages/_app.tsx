@@ -4,7 +4,6 @@ import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CssBaseline, ThemeProvider } from '@mui/material'
 import { theme } from '../themes/default'
-import { MnemonicProvider } from '../providers/mnemonic'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import ModalProvider from 'mui-modal-provider'
@@ -71,11 +70,9 @@ export default function App({ Component, pageProps }: AppProps) {
               />
               <CssBaseline />
               <AuthProvider>
-                <MnemonicProvider>
-                  <ModalProvider>
-                    <Component {...pageProps} />
-                  </ModalProvider>
-                </MnemonicProvider>
+                <ModalProvider>
+                  <Component {...pageProps} />
+                </ModalProvider>
               </AuthProvider>
             </ThemeProvider>
           </RainbowKitProvider>
