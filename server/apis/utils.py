@@ -219,12 +219,6 @@ def verify_token(request, allow_observer=False):
         result = Result(code=401, msg=Result.get_msg('invalid_token', language, []), success=False)
         return Response(result.__dict__, status=status.HTTP_401_UNAUTHORIZED, content_type="application/json")
 
-    if not observer and (
-            not request.META.get('HTTP_USER_AGENT') or current_user.agent != request.META.get('HTTP_USER_AGENT')):
-        logger.info('current_user2 %s 2: %s', current_user.agent,request.META.get('HTTP_USER_AGENT'))
-        result = Result(code=401, msg=Result.get_msg('invalid_token', language, []), success=False)
-        return Response(result.__dict__, status=status.HTTP_401_UNAUTHORIZED, content_type="application/json")
-    logger.info("%s, %s", current_user.agent, request.META['HTTP_USER_AGENT'])
     return current_user
 
 def clean_cache(keys=[]):
