@@ -12,6 +12,7 @@ import VaultSuccessModal from '../modals/vault-success'
 import { useTranslation } from 'react-i18next'
 import { formatEther } from 'viem'
 import { formatTransactionError } from '../../helpers/chain'
+import { executeBatchSendCalls } from '../../helpers/batchTransaction'
 
 
 const formatWeiToEth = (wei: string) => { 
@@ -116,235 +117,33 @@ const MintForm = ({ tab, data }: { tab: number; data: DashboardCardData | null }
 
   // 使用 wallet_sendCalls 批量执行交易
   const executeBatchTransactions = useCallback(async (transactions: any[]) => {
-    if (!address || typeof window === 'undefined') {
-      throw new Error('Wallet not connected')
+    if (!address) throw new Error('Wallet not connected')
+
+    const outcome = await executeBatchSendCalls(address, transactions)
+
+    if (outcome.kind === 'batch_success_no_hash') {
+      setLoading(false)
+      setMintParams(null)
+      setRepayParams(null)
+      setPendingTransactions([])
+      setCurrentTxIndex(0)
+      setLastTxHash(undefined)
+      lastTxDataRef.current = null
+      setShowSuccessModal(true)
+      setAmount('')
+      setTimeout(() => {
+        if (data?.vault) {
+          refreshVault()
+          refreshMint()
+        }
+      }, 3000)
+      return 'batch_success'
     }
 
-    const ethereum = (window as any).ethereum
-    if (!ethereum) {
-      throw new Error('Ethereum provider not found')
-    }
-
-    try {
-      const chainId = transactions[0]?.chainId
-      if (!chainId) {
-        throw new Error('Chain ID not found in transaction data')
-      }
-
-      // 获取链 ID（十六进制格式）
-      const chainIdHex = `0x${Number(chainId).toString(16)}`
-
-      // 构建 calls 数组
-      const calls = transactions.map(tx => {
-        const call: any = {
-          to: tx.to.toLowerCase(),
-          data: tx.data,
-        }
-
-        // 如果 value 不为 0，添加到 call 中（十六进制格式）
-        const txValue = BigInt(typeof tx.value === 'string' ? tx.value : tx.value.toString())
-        if (txValue > BigInt(0)) {
-          call.value = `0x${txValue.toString(16)}`
-        }
-
-        // 后端给出的 gas 转成 hex 传给钱包；不下发就不带，让钱包自估
-        if (tx.gas) {
-          call.gas = `0x${BigInt(tx.gas).toString(16)}`
-        }
-
-        return call
-      })
-
-      // 构建 wallet_sendCalls 请求
-      const requestParams = {
-        version: "2.0.0",
-        chainId: chainIdHex,
-        from: address,
-        calls: calls,
-        atomicRequired: true, // 所有交易必须全部成功
-      }
-
-
-      // 调用 wallet_sendCalls
-      const result = await ethereum.request({
-        method: 'wallet_sendCalls',
-        params: [requestParams],
-      })
-
-
-      // 解析返回结果
-      let batchId: string | undefined
-      let txHash: string | undefined
-
-      if (typeof result === 'string') {
-        // 直接返回字符串，可能是交易 hash 或 batch ID
-        txHash = result
-        batchId = result
-      } else if (Array.isArray(result) && result.length > 0) {
-        txHash = result[0]
-        batchId = result[0]
-      } else if (result && typeof result === 'object') {
-        // 优先查找交易 hash
-        txHash = result.txHash || result.hash
-        // batch ID 用于查询状态
-        batchId = result.id || result.batchId || txHash
-      }
-
-      if (!batchId) {
-        throw new Error('Failed to get batch ID from wallet_sendCalls result')
-      }
-
-      // 如果返回的是 batch ID 而不是交易 hash，需要查询状态获取实际交易 hash
-      if (!txHash || txHash === batchId) {
-        
-        // 轮询查询 batch 状态，最多尝试 10 次
-        let attempts = 0
-        // 30 × 2s = 60s polling, 留够 ~5 个 block 的链上确认时间
-        const maxAttempts = 30
-        const pollInterval = 2000 // 2 秒
-
-        while (attempts < maxAttempts && (!txHash || txHash === batchId)) {
-          try {
-            // 等待一段时间让交易被处理
-            await new Promise(resolve => setTimeout(resolve, pollInterval))
-            
-            // 查询 batch 状态
-            const statusResult: any = await ethereum.request({
-              method: 'wallet_getCallsStatus',
-              params: [batchId],
-            })
-
-
-            // 从状态中提取交易 hash
-            if (statusResult && typeof statusResult === 'object') {
-              // 检查状态：支持数字状态码 200（成功）或字符串状态
-              // PENDING 是"已提交、未上链"，不应判 success；让循环继续 poll 等待真正的确认状态
-              const isSuccess = statusResult.status === 200 ||
-                               statusResult.status === 'CONFIRMED' ||
-                               statusResult.status === 'SUCCESS'
-
-              if (isSuccess) {
-                // 尝试从多个可能的字段中提取交易 hash
-                // 1. 检查 calls 数组中的 hash
-                if (statusResult.calls && Array.isArray(statusResult.calls) && statusResult.calls.length > 0) {
-                  // 取最后一个 call 的 hash（通常是主交易）
-                  const lastCall: any = statusResult.calls[statusResult.calls.length - 1]
-                  txHash = lastCall.hash || lastCall.txHash || lastCall.transactionHash
-                }
-                
-                // 2. 检查 transactions 数组
-                if (!txHash && statusResult.transactions && Array.isArray(statusResult.transactions) && statusResult.transactions.length > 0) {
-                  const lastTx: any = statusResult.transactions[statusResult.transactions.length - 1]
-                  txHash = lastTx.hash || lastTx.txHash || lastTx.transactionHash
-                }
-                
-                // 3. 检查根级别的 hash 字段
-                if (!txHash) {
-                  txHash = statusResult.txHash || statusResult.hash || statusResult.transactionHash
-                }
-
-                // 4. 如果 status 是 200 且没有找到 hash，说明交易已成功但可能还在确认中
-                // 这种情况下，我们可以使用 batch ID 作为标识，但需要特殊处理
-                if (!txHash && statusResult.status === 200) {
-                  // 继续轮询，等待 hash 出现
-                }
-              }
-
-              // 如果状态是失败，抛出错误
-              const isFailed = statusResult.status === 'FAILED' || 
-                              statusResult.status === 'REJECTED' ||
-                              (typeof statusResult.status === 'number' && statusResult.status >= 400)
-              if (isFailed) {
-                throw new Error(`Batch transaction failed: ${statusResult.error || statusResult.message || 'Unknown error'}`)
-              }
-            }
-
-            // 如果找到了交易 hash，退出循环
-            if (txHash && txHash !== batchId) {
-              break
-            }
-
-            attempts++
-          } catch (statusError: any) {
-            console.warn(`Failed to query batch status (attempt ${attempts + 1}):`, statusError)
-            
-            // 如果是最后一次尝试，抛出错误
-            if (attempts >= maxAttempts - 1) {
-              throw new Error(`Failed to get transaction hash from batch status: ${statusError.message || 'Unknown error'}`)
-            }
-            
-            attempts++
-          }
-        }
-
-        // 如果仍然没有找到交易 hash，检查最后一次查询的状态
-        if (!txHash || txHash === batchId) {
-          // 最后一次查询状态结果
-          let lastStatusResult: any = null
-          try {
-            lastStatusResult = await ethereum.request({
-              method: 'wallet_getCallsStatus',
-              params: [batchId],
-            })
-          } catch (e) {
-            console.warn('Failed to get final status:', e)
-          }
-
-          // 如果状态是 200（成功），即使没有交易 hash，也认为交易已成功
-          if (lastStatusResult && lastStatusResult.status === 200) {
-            // 对于批量交易，如果状态是 200，直接标记为成功，不等待确认
-            setLoading(false)
-            setMintParams(null)
-            setRepayParams(null)
-            setPendingTransactions([])
-            setCurrentTxIndex(0)
-            setLastTxHash(undefined)
-            lastTxDataRef.current = null
-            setShowSuccessModal(true)
-            setAmount('')
-            setTimeout(() => {
-              if (data?.vault) {
-                refreshVault()
-                refreshMint()
-              }
-            }, 3000)
-            return 'batch_success'
-          } else {
-            console.warn('Could not extract transaction hash from status after polling, using batch ID')
-            txHash = batchId
-          }
-        }
-      }
-
-
-      // 验证交易 hash 格式（应该是 0x 开头的 66 字符）
-      const isValidHash = txHash && typeof txHash === 'string' && txHash.startsWith('0x') && txHash.length === 66
-      
-      if (!isValidHash) {
-        console.warn('Transaction hash format is invalid, may not be able to wait for confirmation')
-        // 如果 hash 格式无效，无法使用 useWaitForTransactionReceipt 等待
-        // 这种情况下，如果之前查询的状态是 200，应该已经在上面的逻辑中处理了
-        // 否则抛出错误
-        throw new Error('Invalid transaction hash format and batch status is not successful')
-      }
-
-      // 设置最后一个交易 hash，等待确认
-      setLastTxHash(txHash as `0x${string}`)
-      setPendingTransactions(transactions)
-      setCurrentTxIndex(transactions.length - 1) // 设置为最后一笔交易的索引
-
-      return txHash
-    } catch (error: any) {
-      console.error('wallet_sendCalls error:', error)
-      
-      if (error.message?.includes('user rejected') || error.code === 4001) {
-        throw new Error('User rejected the transaction')
-      } else if (error.message?.includes('not supported') || error.message?.includes('method not found')) {
-        throw new Error('Wallet does not support wallet_sendCalls method')
-      } else {
-        throw error
-      }
-    }
+    setLastTxHash(outcome.txHash)
+    setPendingTransactions(transactions)
+    setCurrentTxIndex(transactions.length - 1)
+    return outcome.txHash
   }, [address, data?.vault, refreshVault, refreshMint])
 
   const executeNextTransaction = useCallback((transactions: any[], index: number) => {

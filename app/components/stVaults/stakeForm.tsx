@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 import RewardRate from './RewardRate'
 import { formatEther } from 'viem'
 import { formatTransactionError } from '../../helpers/chain'
+import { executeBatchSendCalls } from '../../helpers/batchTransaction'
 
 const formatWeiToEth = (wei: string) => { 
   const eth = formatWeiToEthFull(wei);
@@ -135,207 +136,34 @@ const StakeForm = ({ tab, data }: { tab: number; data: DashboardCardData | null 
 
   // 使用 wallet_sendCalls 批量执行交易
   const executeBatchTransactions = useCallback(async (transactions: any[]) => {
-    if (!address || typeof window === 'undefined') {
-      throw new Error('Wallet not connected')
+    if (!address) throw new Error('Wallet not connected')
+
+    const outcome = await executeBatchSendCalls(address, transactions)
+
+    if (outcome.kind === 'batch_success_no_hash') {
+      setLoading(false)
+      setWithdrawParams(null)
+      setSupplyParams(null)
+      setPendingTransactions([])
+      setCurrentTxIndex(0)
+      setLastTxHash(undefined)
+      lastTxDataRef.current = null
+      setShowSuccessModal(true)
+      setAmount('')
+      setTimeout(() => {
+        if (data?.vault) {
+          refreshVault()
+          refreshWithdraw()
+        }
+        refetchBalance()
+      }, 3000)
+      return 'batch_success'
     }
 
-    const ethereum = (window as any).ethereum
-    if (!ethereum) {
-      throw new Error('Ethereum provider not found')
-    }
-
-    try {
-      const chainId = transactions[0]?.chainId
-      if (!chainId) {
-        throw new Error('Chain ID not found in transaction data')
-      }
-
-      // 获取链 ID（十六进制格式）
-      const chainIdHex = `0x${Number(chainId).toString(16)}`
-
-      // 构建 calls 数组
-      const calls = transactions.map(tx => {
-        const call: any = {
-          to: tx.to.toLowerCase(),
-          data: tx.data,
-        }
-
-        // 如果 value 不为 0，添加到 call 中（十六进制格式）
-        const txValue = BigInt(typeof tx.value === 'string' ? tx.value : tx.value.toString())
-        if (txValue > BigInt(0)) {
-          call.value = `0x${txValue.toString(16)}`
-        }
-
-        // 后端给出的 gas 转成 hex 传给钱包；不下发就不带，让钱包自估
-        if (tx.gas) {
-          call.gas = `0x${BigInt(tx.gas).toString(16)}`
-        }
-
-        return call
-      })
-
-      // 构建 wallet_sendCalls 请求
-      const requestParams = {
-        version: "2.0.0",
-        chainId: chainIdHex,
-        from: address,
-        calls: calls,
-        atomicRequired: true, // 所有交易必须全部成功
-      }
-
-
-      // 调用 wallet_sendCalls
-      const result = await ethereum.request({
-        method: 'wallet_sendCalls',
-        params: [requestParams],
-      })
-
-
-      // 解析返回结果
-      let batchId: string | undefined
-      let txHash: string | undefined
-
-      if (typeof result === 'string') {
-        txHash = result
-        batchId = result
-      } else if (Array.isArray(result) && result.length > 0) {
-        txHash = result[0]
-        batchId = result[0]
-      } else if (result && typeof result === 'object') {
-        txHash = result.txHash || result.hash
-        batchId = result.id || result.batchId || txHash
-      }
-
-      if (!batchId) {
-        throw new Error('Failed to get batch ID from wallet_sendCalls result')
-      }
-
-      // 如果返回的是 batch ID 而不是交易 hash，需要查询状态获取实际交易 hash
-      if (!txHash || txHash === batchId) {
-
-        let attempts = 0
-        // 30 × 2s = 60s polling, 留够 ~5 个 block 的链上确认时间
-        const maxAttempts = 30
-        const pollInterval = 2000
-
-        while (attempts < maxAttempts && (!txHash || txHash === batchId)) {
-          try {
-            await new Promise(resolve => setTimeout(resolve, pollInterval))
-
-            const statusResult: any = await ethereum.request({
-              method: 'wallet_getCallsStatus',
-              params: [batchId],
-            })
-
-
-            if (statusResult && typeof statusResult === 'object') {
-              // PENDING 是"已提交、未上链"，不应判 success；让循环继续 poll 等待真正的确认状态
-              const isSuccess = statusResult.status === 200 ||
-                statusResult.status === 'CONFIRMED' ||
-                statusResult.status === 'SUCCESS'
-
-              if (isSuccess) {
-                if (statusResult.calls && Array.isArray(statusResult.calls) && statusResult.calls.length > 0) {
-                  const lastCall: any = statusResult.calls[statusResult.calls.length - 1]
-                  txHash = lastCall.hash || lastCall.txHash || lastCall.transactionHash
-                }
-
-                if (!txHash && statusResult.transactions && Array.isArray(statusResult.transactions) && statusResult.transactions.length > 0) {
-                  const lastTx: any = statusResult.transactions[statusResult.transactions.length - 1]
-                  txHash = lastTx.hash || lastTx.txHash || lastTx.transactionHash
-                }
-
-                if (!txHash) {
-                  txHash = statusResult.txHash || statusResult.hash || statusResult.transactionHash
-                }
-
-                if (!txHash && statusResult.status === 200) {
-                }
-              }
-
-              const isFailed = statusResult.status === 'FAILED' ||
-                statusResult.status === 'REJECTED' ||
-                (typeof statusResult.status === 'number' && statusResult.status >= 400)
-              if (isFailed) {
-                throw new Error(`Batch transaction failed: ${statusResult.error || statusResult.message || 'Unknown error'}`)
-              }
-            }
-
-            if (txHash && txHash !== batchId) {
-              break
-            }
-
-            attempts++
-          } catch (statusError: any) {
-            console.warn(`Failed to query batch status (attempt ${attempts + 1}):`, statusError)
-
-            if (attempts >= maxAttempts - 1) {
-              throw new Error(`Failed to get transaction hash from batch status: ${statusError.message || 'Unknown error'}`)
-            }
-
-            attempts++
-          }
-        }
-
-        if (!txHash || txHash === batchId) {
-          let lastStatusResult: any = null
-          try {
-            lastStatusResult = await ethereum.request({
-              method: 'wallet_getCallsStatus',
-              params: [batchId],
-            })
-          } catch (e) {
-            console.warn('Failed to get final status:', e)
-          }
-
-          if (lastStatusResult && lastStatusResult.status === 200) {
-            setLoading(false)
-            setWithdrawParams(null)
-            setSupplyParams(null)
-            setPendingTransactions([])
-            setCurrentTxIndex(0)
-            setLastTxHash(undefined)
-            lastTxDataRef.current = null
-            setShowSuccessModal(true)
-            setAmount('')
-            setTimeout(() => {
-              if (data?.vault) {
-                refreshVault()
-                refreshWithdraw()
-              }
-              refetchBalance()
-            }, 3000)
-            return 'batch_success'
-          } else {
-            console.warn('Could not extract transaction hash from status after polling, using batch ID')
-            txHash = batchId
-          }
-        }
-      }
-
-
-      const isValidHash = txHash && typeof txHash === 'string' && txHash.startsWith('0x') && txHash.length === 66
-
-      if (!isValidHash) {
-        throw new Error('Invalid transaction hash format and batch status is not successful')
-      }
-
-      setLastTxHash(txHash as `0x${string}`)
-      setPendingTransactions(transactions)
-      setCurrentTxIndex(transactions.length - 1)
-
-      return txHash
-    } catch (error: any) {
-      console.error('wallet_sendCalls error:', error)
-
-      if (error.message?.includes('user rejected') || error.code === 4001) {
-        throw new Error('User rejected the transaction')
-      } else if (error.message?.includes('not supported') || error.message?.includes('method not found')) {
-        throw new Error('Wallet does not support wallet_sendCalls method')
-      } else {
-        throw error
-      }
-    }
+    setLastTxHash(outcome.txHash)
+    setPendingTransactions(transactions)
+    setCurrentTxIndex(transactions.length - 1)
+    return outcome.txHash
   }, [address, data?.vault, refreshVault, refreshWithdraw, refetchBalance])
 
   const executeNextTransaction = useCallback((transactions: any[], index: number) => {
